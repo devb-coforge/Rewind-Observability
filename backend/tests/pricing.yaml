@@ -1,0 +1,4 @@
+models:
+  claude-sonnet-4: {input: 3, output: 15, cache_read: 0.3, cache_write: 3.75}
+  gpt-4o-mini: {input: 0.15, output: 0.6}
+  gpt-4o: {input: 2.5, output: 10, cache_read: 1.25, cache_write: 0}

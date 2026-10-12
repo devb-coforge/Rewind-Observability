@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #12140f;
+  --surface: #1b1e16;
+  --surface-2: #24281e;
+  --line: #34392c;
+  --text: #f4f0e6;
+  --muted: #a8a292;
+  --accent: #e2b340;
+  --danger: #e36a58;
+  --ok: #8fbf6a;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.md p {
+  margin: 0.35rem 0;
+}
+
+.md pre,
+.md code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.md pre {
+  overflow: auto;
+  background: #10120c;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.4rem;
+}
+
+.md :not(pre) > code {
+  background: #10120c;
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.25rem;
+}
+
+.md ul {
+  margin: 0.35rem 0;
+  padding-left: 1.2rem;
+}

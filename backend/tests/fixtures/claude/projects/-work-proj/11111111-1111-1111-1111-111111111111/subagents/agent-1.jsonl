@@ -1,0 +1,2 @@
+{"type":"user","uuid":"su1","sessionId":"agent-1","cwd":"/work/proj","timestamp":"2026-01-02T15:05:00.000Z","message":{"role":"user","content":"sub task"}}
+{"type":"assistant","uuid":"sa1","parentUuid":"su1","sessionId":"agent-1","cwd":"/work/proj","timestamp":"2026-01-02T15:05:01.000Z","message":{"id":"msg_s","role":"assistant","model":"claude-sonnet-4-20250514","content":[{"type":"text","text":"sub done"}],"usage":{"input_tokens":3,"output_tokens":1}}}
