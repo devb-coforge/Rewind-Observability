@@ -1,6 +1,6 @@
 # Obs
 
-A single-user web app that indexes local Claude Code and Codex CLI transcripts. It is a transcript viewer, a usage tracker, an OpenTelemetry export, path-boundary alerts, and a private benchmark. The transcript files stay read-only. Notes, hidden projects, path allows, and benchmark cases live in a separate database on the app volume.
+A single-user web app that indexes local agent transcripts. It is a transcript viewer, a usage tracker, an OpenTelemetry export, path-boundary alerts, and a private benchmark. The transcript files stay read-only. Notes, hidden projects, path allows, and benchmark cases live in a separate database on the app volume.
 
 Usage and cost are estimates for understanding activity. They are not billing numbers. Missing usage stays unknown.
 
@@ -86,20 +86,22 @@ Backend (Python 3.12+, [uv](https://docs.astral.sh/uv/)):
 ```bash
 cd backend
 uv sync --extra dev
-OBS_SOURCES="$HOME/.claude,$HOME/.codex" \
-OBS_DATA_DIR=../data \
-uv run uvicorn obs.main:app --factory --host 127.0.0.1 --port 8080
+cp .env.example .env   # edit paths and port if needed
+uv run obs
 ```
+
+`backend/.env` is loaded automatically. Defaults are `127.0.0.1:8080` (`OBS_HOST`, `OBS_PORT`). Docker sets `OBS_HOST=0.0.0.0` so the published port works.
 
 Frontend:
 
 ```bash
 cd frontend
 npm install
+cp .env.example .env   # match OBS_PORT to the backend
 npm run dev
 ```
 
-The dev server proxies `/api` to port 8080. Open http://127.0.0.1:5173.
+The dev server proxies `/api` using `OBS_HOST` and `OBS_PORT` from `frontend/.env`. Open http://127.0.0.1:5173.
 
 Regenerate the OpenAPI types while the API is running:
 

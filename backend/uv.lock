@@ -141,6 +141,7 @@ dependencies = [
     { name = "opentelemetry-proto" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "uvicorn" },
 ]
@@ -159,6 +160,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3" },
+    { name = "python-dotenv", specifier = ">=1.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]

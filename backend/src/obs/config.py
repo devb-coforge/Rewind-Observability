@@ -35,8 +35,21 @@ class AppConfig(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
 
+def _backend_dir() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
+
+
+def load_dotenv_file() -> None:
+    """Load backend/.env when present (no-op if missing)."""
+    from dotenv import load_dotenv
+
+    path = _backend_dir() / ".env"
+    if path.is_file():
+        load_dotenv(path)
 
 
 def default_pricing_file() -> Path | None:
@@ -75,6 +88,7 @@ def default_static_dir() -> Path | None:
 
 def load_config() -> AppConfig:
     """Load config.yaml plus OBS_* environment overrides."""
+    load_dotenv_file()
     config_path = os.environ.get("OBS_CONFIG")
     data: dict = {}
     if config_path:

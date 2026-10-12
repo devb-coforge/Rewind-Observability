@@ -7,7 +7,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "gen:api": "openapi-typescript http://127.0.0.1:8080/openapi.json -o src/api/schema.ts"
+    "gen:api": "node scripts/gen-api.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.6",
