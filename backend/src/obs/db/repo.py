@@ -122,6 +122,9 @@ class Store:
             )
         )
 
+    def list_files(self) -> list[sqlite3.Row]:
+        return list(self.index.execute("SELECT * FROM files"))
+
     def delete_events_for_path(self, path: str) -> list[str]:
         rows = list(
             self.index.execute("SELECT rowid, id, session_id FROM events WHERE raw_path = ?", (path,))

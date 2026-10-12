@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 class SourceConfig(BaseModel):
     path: str
-    agent: Literal["claude_code", "codex"] | None = None
 
 
 class OtelConfig(BaseModel):

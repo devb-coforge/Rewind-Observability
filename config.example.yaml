@@ -1,9 +1,7 @@
 # Copy to config.yaml and edit, or set OBS_SOURCES / OBS_CONFIG.
 sources:
   - path: /sources/claude
-    agent: claude_code
   - path: /sources/codex
-    agent: codex
 
 data_dir: /data
 pricing_file: /app/pricing.yaml

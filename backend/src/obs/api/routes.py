@@ -12,7 +12,7 @@ from obs.benchmark import delete_case, freeze_case, get_case, list_cases, summar
 from obs.analytics import queries
 from obs.export_run import export_pending
 from obs.ingest.pipeline import Ingestor
-from obs.ingest.scanner import resolve_sources
+from obs.ingest.scanner import path_under_source, resolve_agent, resolve_sources, source_root
 
 router = APIRouter(prefix="/api")
 
@@ -72,13 +72,13 @@ def sources(request: Request) -> dict:
     with obs.store.transaction():
         items = []
         for source, adapter in resolve_sources(obs.config.sources):
-            root = Path(source.path)
-            files = obs.store.files_under(str(root)) if root.exists() else []
+            root = source_root(source)
+            files = obs.store.files_under(str(root.resolve())) if root.exists() else []
             session_ids = {row["session_id"] for row in files if row["session_id"]}
             items.append(
                 {
                     "path": source.path,
-                    "agent": adapter.name if adapter else source.agent,
+                    "agent": adapter.name if adapter else resolve_agent(source),
                     "detected": adapter is not None and root.exists(),
                     "exists": root.exists(),
                     "files": len(files),
@@ -469,17 +469,7 @@ def _filters(agent, project, model, start, end, include_hidden) -> dict:
 
 
 def _allowed_source(path: Path, sources) -> bool:
-    resolved = path.resolve()
-    for source in sources:
-        root = Path(source.path)
-        if not root.exists():
-            continue
-        try:
-            resolved.relative_to(root.resolve())
-            return True
-        except ValueError:
-            continue
-    return False
+    return any(path_under_source(path, source) for source in sources)
 
 
 def _prefix_hit(path: str, prefixes: list[str]) -> bool:

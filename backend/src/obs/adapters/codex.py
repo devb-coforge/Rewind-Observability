@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+from obs.adapters.detect import infer_agent_from_path
 from obs.adapters.lineio import complete_lines, int_or_none, loads_obj, parse_ts, stringify
 from obs.models import ParsedEvent, ParseResult, Usage
 
@@ -16,11 +17,7 @@ class CodexAdapter:
     version = 1
 
     def detect(self, root: Path) -> bool:
-        if not root.exists():
-            return False
-        if (root / "sessions").is_dir():
-            return True
-        return any(root.glob("rollout-*.jsonl"))
+        return infer_agent_from_path(root) == "codex"
 
     def discover(self, root: Path) -> list[Path]:
         if not root.exists():

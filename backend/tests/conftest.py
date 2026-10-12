@@ -29,8 +29,8 @@ def make_client(tmp_path: Path, source_dirs: tuple[Path, Path]):
     def _make(*, endpoint: str = "", include_content: bool = False, sender=None, allow_prefixes=None):
         config = AppConfig(
             sources=[
-                SourceConfig(path=str(claude), agent="claude_code"),
-                SourceConfig(path=str(codex), agent="codex"),
+                SourceConfig(path=str(claude)),
+                SourceConfig(path=str(codex)),
             ],
             data_dir=tmp_path / "data",
             pricing_file=ROOT / "pricing.yaml",

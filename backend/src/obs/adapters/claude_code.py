@@ -2,20 +2,29 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from obs.adapters.detect import infer_agent_from_path
 from obs.adapters.lineio import complete_lines, int_or_none, loads_obj, parse_ts, stringify
 from obs.models import ParsedEvent, ParseResult, Usage
 
 
+# Session bookkeeping records are not conversation turns. In particular,
+# cost-state is cumulative and must not be counted as per-message usage.
+_BOOKKEEPING_TYPES = {
+    "mode",
+    "permission-mode",
+    "atis-latch",
+    "file-history-snapshot",
+    "last-prompt",
+    "cost-state",
+}
+
+
 class ClaudeCodeAdapter:
     name = "claude_code"
-    version = 1
+    version = 2
 
     def detect(self, root: Path) -> bool:
-        if not root.exists():
-            return False
-        if (root / "projects").is_dir():
-            return True
-        return any(root.glob("*.jsonl"))
+        return infer_agent_from_path(root) == "claude_code"
 
     def discover(self, root: Path) -> list[Path]:
         if not root.exists():
@@ -94,6 +103,39 @@ class ClaudeCodeAdapter:
         native = obj.get("uuid") if isinstance(obj.get("uuid"), str) else None
         parent = obj.get("parentUuid") if isinstance(obj.get("parentUuid"), str) else None
 
+        if isinstance(typ, str) and typ in _BOOKKEEPING_TYPES:
+            return
+
+        if typ == "attachment":
+            attachment = obj.get("attachment")
+            if isinstance(attachment, dict):
+                subtype = attachment.get("type", "attachment")
+                rendered = obj.get("rendered")
+                texts = (
+                    [
+                        item["content"]
+                        for item in rendered
+                        if isinstance(item, dict) and isinstance(item.get("content"), str)
+                    ]
+                    if isinstance(rendered, list)
+                    else []
+                )
+                text = "\n\n".join(texts) if texts else stringify(attachment)[:2000]
+                result.events.append(
+                    ParsedEvent(
+                        native_id=native,
+                        block_index=0,
+                        parent_native_id=parent,
+                        ts=ts,
+                        role="system",
+                        kind="system",
+                        text=f"Attachment: {subtype}\n{text}",
+                        raw_offset=offset,
+                        raw_length=length,
+                    )
+                )
+                return
+
         if typ == "summary":
             summary = obj.get("summary")
             result.events.append(
@@ -139,7 +181,7 @@ class ClaudeCodeAdapter:
                     ts=ts,
                     role="system",
                     kind="unknown",
-                    text=None,
+                    text=f"Unsupported Claude Code record: {typ!r}",
                     raw_offset=offset,
                     raw_length=length,
                 )

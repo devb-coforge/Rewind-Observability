@@ -73,8 +73,9 @@ def test_incremental_append_parses_only_new_line(client, source_dirs):
     assert any(event["text"] == "One more thing" for event in events)
 
 
-def test_truncated_line_waits_for_newline(make_client, tmp_path):
-    root = tmp_path / "only-claude" / "projects" / "p"
+def test_truncated_line_waits_for_newline(tmp_path):
+    claude_home = tmp_path / "trunc" / "claude"
+    root = claude_home / "projects" / "p"
     root.mkdir(parents=True)
     path = root / "sess.jsonl"
     path.write_text(
@@ -96,7 +97,7 @@ def test_truncated_line_waits_for_newline(make_client, tmp_path):
 
     app = create_app(
         AppConfig(
-            sources=[SourceConfig(path=str(tmp_path / "only-claude"), agent="claude_code")],
+            sources=[SourceConfig(path=str(claude_home))],
             data_dir=tmp_path / "data2",
             pricing_file=Path(__file__).parent / "pricing.yaml",
             ingest_on_startup=False,

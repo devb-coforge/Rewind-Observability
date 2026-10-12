@@ -29,7 +29,9 @@ environment:
   OBS_SOURCES: /sources/claude,/sources/codex,/sources/extra
 ```
 
-Each root can name its agent in `config.yaml` (`claude_code` or `codex`) or leave detection to the adapters. Copy `config.example.yaml` and set `OBS_CONFIG` to that file if you prefer a file over the environment variable.
+Each source root maps to an agent by **folder name**: the last path component must be `.claude` or `claude` for Claude Code, `.codex` or `codex` for Codex. That covers `$HOME/.claude`, `$HOME/.codex`, and Docker mounts at `/sources/claude` and `/sources/codex`. Other locations need a symlink or mount with one of those names.
+
+Indexed files outside the configured source roots are removed on every rescan, so test fixtures or old paths do not linger after you change `OBS_SOURCES`.
 
 A rescan reads appended bytes. **Full rebuild** on the Sources page reparses every file. Rebuilding the index does not delete notes, hidden-project preferences, path allows, or benchmark cases.
 

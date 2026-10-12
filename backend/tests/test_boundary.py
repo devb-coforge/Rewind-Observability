@@ -40,7 +40,7 @@ def _line(uuid: str, session: str, cwd: str | None, content, tool=None) -> dict:
 def _client(tmp_path: Path, root: Path, allow=None) -> TestClient:
     app = create_app(
         AppConfig(
-            sources=[SourceConfig(path=str(root), agent="claude_code")],
+            sources=[SourceConfig(path=str(root))],
             data_dir=tmp_path / "data",
             pricing_file=PRICING,
             ingest_on_startup=False,
@@ -54,7 +54,7 @@ def _client(tmp_path: Path, root: Path, allow=None) -> TestClient:
 
 
 def test_file_inside_is_quiet_and_parent_and_absolute_alert(tmp_path: Path):
-    root = tmp_path / "src"
+    root = tmp_path / "claude"
     _write(
         root,
         "s.jsonl",
@@ -80,7 +80,7 @@ def test_file_inside_is_quiet_and_parent_and_absolute_alert(tmp_path: Path):
 
 
 def test_missing_cwd_does_not_alert(tmp_path: Path):
-    root = tmp_path / "src"
+    root = tmp_path / "claude"
     _write(
         root,
         "s.jsonl",
@@ -94,7 +94,7 @@ def test_missing_cwd_does_not_alert(tmp_path: Path):
 
 
 def test_dismissal_hides_prefix_and_survives_reindex(tmp_path: Path):
-    root = tmp_path / "src"
+    root = tmp_path / "claude"
     _write(
         root,
         "s.jsonl",

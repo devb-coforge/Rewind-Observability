@@ -8,7 +8,7 @@ from obs.analytics.pricing import Pricing
 from obs.config import AppConfig
 from obs.db.repo import Store, build_event_row, project_fields
 from obs.identity import event_id_for, session_id_for
-from obs.ingest.scanner import resolve_sources
+from obs.ingest.scanner import path_under_source, resolve_sources, source_root
 
 log = logging.getLogger("obs.ingest")
 
@@ -20,13 +20,19 @@ class Ingestor:
         self.pricing = pricing
 
     def run(self, *, full: bool = False) -> dict:
-        stats = {"files_seen": 0, "files_parsed": 0, "files_skipped": 0, "events": 0}
+        stats = {
+            "files_seen": 0,
+            "files_parsed": 0,
+            "files_skipped": 0,
+            "files_removed": 0,
+            "events": 0,
+        }
         affected: set[str] = set()
         with self.store.transaction():
             if full:
                 self.store.reset_index()
             for source, adapter in resolve_sources(self.config.sources):
-                root = Path(source.path)
+                root = source_root(source)
                 if adapter is None or not root.exists():
                     continue
                 discovered: list[Path] = []
@@ -44,6 +50,7 @@ class Ingestor:
                         stats["files_parsed"] += 1
                         stats["events"] += added
                 self._prune(root, discovered, affected)
+            stats["files_removed"] += self._prune_outside_sources(affected)
             dismissals = {
                 row["project_id"]: self.store.dismissal_prefixes(row["project_id"])
                 for row in self.store.index.execute("SELECT DISTINCT project_id FROM sessions")
@@ -73,9 +80,21 @@ class Ingestor:
             row = self.store.index.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()
             return int(row["n"])
 
+    def _prune_outside_sources(self, affected: set[str]) -> int:
+        removed = 0
+        for row in self.store.list_files():
+            if any(path_under_source(row["path"], source) for source in self.config.sources):
+                continue
+            affected.update(self.store.delete_events_for_path(row["path"]))
+            if row["session_id"]:
+                affected.add(row["session_id"])
+            self.store.delete_file(row["path"])
+            removed += 1
+        return removed
+
     def _prune(self, root: Path, discovered: list[Path], affected: set[str]) -> None:
         found = {str(path) for path in discovered}
-        for row in self.store.files_under(str(root)):
+        for row in self.store.files_under(str(root.resolve())):
             if row["path"] in found:
                 continue
             affected.update(self.store.delete_events_for_path(row["path"]))
@@ -89,6 +108,7 @@ class Ingestor:
         if (
             previous
             and previous["adapter_version"] == adapter.version
+            and previous["agent"] == adapter.name
             and previous["size"] == stat.st_size
             and previous["mtime"] == stat.st_mtime
         ):
