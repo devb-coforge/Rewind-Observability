@@ -1,9 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, ChevronDown, FlaskConical, Minus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { BenchmarkCase } from "../api/types";
-import { agentLabel, formatCost, formatPercent, formatTokens } from "../lib/format";
+import { AgentBadge, Badge, Button, Card, EmptyState, Input, Page, PageHeader, SectionTitle, Select, td, th, Toolbar } from "../components/ui";
+import { cn } from "../lib/cn";
+import { formatCompact, formatCost, formatPercent, formatTokens } from "../lib/format";
 
 export function BenchmarkPage() {
   const queryClient = useQueryClient();
@@ -23,60 +26,88 @@ export function BenchmarkPage() {
     return queryClient.invalidateQueries({ queryKey: ["benchmark"] });
   }
 
+  const groups = summary.data?.groups ?? [];
+  const caseList = cases.data?.cases ?? [];
+
   return (
-    <div className="h-full overflow-auto px-4 py-4 md:px-6">
-      <div className="mb-4 flex flex-wrap gap-2">
-        <select className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm" aria-label="Project" value={project} onChange={(event) => setProject(event.target.value)}>
+    <Page>
+      <PageHeader title="Benchmark" description="Frozen session slices, labeled pass or fail, compared by model." />
+      <Toolbar>
+        <Select className="w-52" aria-label="Project" value={project} onChange={(event) => setProject(event.target.value)}>
           <option value="">All projects</option>
           {(projects.data?.projects ?? []).map((item) => (
             <option key={item.project_id} value={item.project_id}>
               {item.name}
             </option>
           ))}
-        </select>
-        <select className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm" aria-label="Verdict" value={verdict} onChange={(event) => setVerdict(event.target.value)}>
+        </Select>
+        <Select className="w-36" aria-label="Verdict" value={verdict} onChange={(event) => setVerdict(event.target.value)}>
           <option value="">All verdicts</option>
           <option value="unset">Unset</option>
           <option value="pass">Pass</option>
           <option value="fail">Fail</option>
-        </select>
-      </div>
-      <div className="mb-6 overflow-x-auto rounded-xl border border-line">
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="text-xs uppercase tracking-wide text-muted">
+        </Select>
+      </Toolbar>
+      <SectionTitle>By model</SectionTitle>
+      <Card className="mb-8 overflow-x-auto">
+        <table className="w-full min-w-[640px] text-[13px]">
+          <thead className="bg-surface2/50">
             <tr>
-              <th className="px-4 py-2 font-medium">Model</th>
-              <th className="px-3 py-2 font-medium">Cases</th>
-              <th className="px-3 py-2 font-medium">Pass rate</th>
-              <th className="px-3 py-2 font-medium">Median cost</th>
-              <th className="px-3 py-2 font-medium">Median tokens</th>
+              <th className={th}>Model</th>
+              <th className={cn(th, "text-right")}>Cases</th>
+              <th className={th}>Pass rate</th>
+              <th className={cn(th, "text-right")}>Median cost</th>
+              <th className={cn(th, "text-right")}>Median tokens</th>
             </tr>
           </thead>
-          <tbody>
-            {(summary.data?.groups ?? []).map((group) => (
-              <tr key={group.model} className="border-t border-line">
-                <td className="px-4 py-2">{group.model}</td>
-                <td className="px-3 py-2">{group.n}</td>
-                <td className="px-3 py-2">
-                  {formatPercent(group.pass_rate)}
-                  <span className="text-xs text-muted"> ({group.n_verdict} labeled)</span>
+          <tbody className="divide-y divide-line">
+            {groups.map((group) => (
+              <tr key={group.model} className="hover:bg-surface2/60">
+                <td className={cn(td, "font-mono text-xs")}>{group.model}</td>
+                <td className={cn(td, "text-right tabular-nums")}>{group.n}</td>
+                <td className={td}>
+                  <div className="flex items-center gap-3">
+                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface3">
+                      <div className="h-full rounded-full bg-ok" style={{ width: `${Math.round((group.pass_rate ?? 0) * 100)}%` }} />
+                    </div>
+                    <span className="tabular-nums">{formatPercent(group.pass_rate)}</span>
+                    <span className="text-2xs text-subtle">({group.n_verdict} labeled)</span>
+                  </div>
                 </td>
-                <td className="px-3 py-2">{formatCost(group.median_cost)}</td>
-                <td className="px-3 py-2">{formatTokens(group.median_tokens)}</td>
+                <td className={cn(td, "text-right tabular-nums")}>{formatCost(group.median_cost)}</td>
+                <td className={cn(td, "text-right tabular-nums text-muted")}>{formatCompact(group.median_tokens)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {summary.data && summary.data.groups.length === 0 ? <p className="px-4 py-3 text-sm text-muted">No cases yet. Freeze one from a session.</p> : null}
-      </div>
+        {summary.data && groups.length === 0 ? (
+          <p className="px-4 py-4 text-[13px] text-muted">No cases yet. Freeze one from a session.</p>
+        ) : null}
+      </Card>
+      <SectionTitle aside={caseList.length ? <span className="text-2xs tabular-nums text-subtle">{caseList.length}</span> : undefined}>
+        Cases
+      </SectionTitle>
+      {cases.data && caseList.length === 0 ? (
+        <EmptyState
+          icon={<FlaskConical className="size-6" />}
+          title="No cases match"
+          description="Open a session and use “Freeze a benchmark case” to capture one."
+        />
+      ) : null}
       <div className="space-y-3">
-        {(cases.data?.cases ?? []).map((item) => (
+        {caseList.map((item) => (
           <CaseCard key={item.id} item={item} onChange={refresh} />
         ))}
       </div>
-    </div>
+    </Page>
   );
 }
+
+const verdictStyle = {
+  pass: { icon: Check, active: "border-ok/40 bg-ok/10 text-ok" },
+  fail: { icon: X, active: "border-danger/40 bg-danger/10 text-danger" },
+  unset: { icon: Minus, active: "border-line-strong bg-surface3 text-ink" },
+} as const;
 
 function CaseCard({ item, onChange }: { item: BenchmarkCase; onChange: () => Promise<void> }) {
   const [note, setNote] = useState(item.note ?? "");
@@ -99,77 +130,103 @@ function CaseCard({ item, onChange }: { item: BenchmarkCase; onChange: () => Pro
   }
 
   return (
-    <article className="rounded-xl border border-line bg-surface p-4">
+    <Card className="p-4">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
-          <Link className="text-sm text-accent hover:underline" to={`/sessions/${encodeURIComponent(item.session_id)}`}>
+          <Link className="line-clamp-2 text-[13px] font-medium text-ink hover:text-accent" to={`/sessions/${encodeURIComponent(item.session_id)}`}>
             {item.prompt || item.session_id}
           </Link>
-          <p className="mt-1 text-xs text-muted">
-            {agentLabel(item.agent)} · {item.model || "unknown model"} · {item.project_name || "(unknown)"} ·{" "}
-            {formatCost(item.est_cost_usd)} · {formatTokens(item.tokens_in)} / {formatTokens(item.tokens_out)} tokens
-          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-2xs text-subtle">
+            <AgentBadge agent={item.agent} />
+            <span className="font-mono">{item.model || "unknown model"}</span>
+            <span aria-hidden="true">·</span>
+            <span>{item.project_name || "(unknown)"}</span>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">{formatCost(item.est_cost_usd)}</span>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">
+              {formatTokens(item.tokens_in)} / {formatTokens(item.tokens_out)} tokens
+            </span>
+          </div>
         </div>
-        <div className="flex gap-1">
-          {(["pass", "fail", "unset"] as const).map((verdict) => (
-            <button
-              key={verdict}
-              type="button"
-              className={`rounded-md border px-2 py-1 text-xs ${item.verdict === verdict ? "border-accent text-accent" : "border-line text-muted"}`}
-              onClick={() => void setVerdict(verdict)}
-            >
-              {verdict}
-            </button>
-          ))}
+        <div role="group" aria-label="Verdict" className="inline-flex rounded-md border border-line bg-bg p-0.5">
+          {(["pass", "fail", "unset"] as const).map((verdict) => {
+            const { icon: Icon, active } = verdictStyle[verdict];
+            const selected = item.verdict === verdict;
+            return (
+              <button
+                key={verdict}
+                type="button"
+                aria-pressed={selected}
+                className={cn(
+                  "flex h-6 items-center gap-1 rounded border px-2 text-2xs font-medium capitalize transition-colors",
+                  selected ? active : "border-transparent text-subtle hover:text-ink",
+                )}
+                onClick={() => void setVerdict(verdict)}
+              >
+                <Icon aria-hidden="true" className="size-3" />
+                {verdict}
+              </button>
+            );
+          })}
         </div>
       </div>
-      <ul className="mt-3 space-y-1 text-xs text-muted">
-        {item.tool_summary.map((tool, index) => (
-          <li key={`${tool.tool_name}-${index}`}>
-            {tool.tool_name || "tool"}
-            {tool.is_error ? " · error" : ""}
-            {tool.paths.length ? ` · ${tool.paths.join(", ")}` : ""}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className="text-xs text-accent" onClick={() => setOpen((value) => !value)}>
+      {item.tool_summary.length ? (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {item.tool_summary.map((tool, index) => (
+            <Badge
+              key={`${tool.tool_name}-${index}`}
+              tone={tool.is_error ? "danger" : "neutral"}
+              className="max-w-full font-mono"
+            >
+              <span className="truncate" title={tool.paths.join(", ") || undefined}>
+                {tool.tool_name || "tool"}
+                {tool.paths.length ? ` · ${tool.paths.join(", ")}` : ""}
+              </span>
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+      {open && detail.data ? (
+        <div className="mt-3 space-y-3 rounded-md border border-line bg-bg/60 p-3 text-[13px]">
+          <div>
+            <div className="mb-1 text-2xs font-medium uppercase tracking-[0.06em] text-subtle">Prompt</div>
+            <p className="whitespace-pre-wrap leading-relaxed">{detail.data.prompt}</p>
+          </div>
+          <div>
+            <div className="mb-1 text-2xs font-medium uppercase tracking-[0.06em] text-subtle">Final message</div>
+            <p className="whitespace-pre-wrap leading-relaxed text-muted">{detail.data.final_message}</p>
+          </div>
+        </div>
+      ) : null}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        <Input className="min-w-48 flex-1" placeholder="Add a note" aria-label="Case note" value={note} onChange={(event) => setNote(event.target.value)} />
+        <Button
+          size="sm"
+          className="h-8"
+          onClick={() => void api.patchCase(item.id, { note }).then(onChange).catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not save the note"))}
+        >
+          Save note
+        </Button>
+        <Button size="sm" variant="ghost" className="h-8" onClick={() => setOpen((value) => !value)}>
+          <ChevronDown aria-hidden="true" className={cn("size-3.5 transition-transform", open && "rotate-180")} />
           {open ? "Hide detail" : "Show detail"}
-        </button>
-        <button
-          type="button"
-          className="text-xs text-danger"
+        </Button>
+        <Button
+          size="sm"
+          variant="danger"
+          className="h-8"
           onClick={() => {
             if (window.confirm("Delete this case?")) {
               void api.deleteCase(item.id).then(onChange);
             }
           }}
         >
+          <Trash2 aria-hidden="true" className="size-3.5" />
           Delete
-        </button>
-      </div>
-      {open && detail.data ? (
-        <div className="mt-3 space-y-2 text-sm">
-          <p className="whitespace-pre-wrap">{detail.data.prompt}</p>
-          <p className="whitespace-pre-wrap text-muted">{detail.data.final_message}</p>
-        </div>
-      ) : null}
-      <div className="mt-3 flex gap-2">
-        <input
-          className="min-w-0 flex-1 rounded-md border border-line bg-[#10120c] px-2 py-1 text-sm"
-          aria-label="Case note"
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-        />
-        <button
-          type="button"
-          className="rounded-md border border-line px-2 py-1 text-sm"
-          onClick={() => void api.patchCase(item.id, { note }).then(onChange).catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not save the note"))}
-        >
-          Save note
-        </button>
+        </Button>
       </div>
       {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
-    </article>
+    </Card>
   );
 }

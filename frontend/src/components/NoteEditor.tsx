@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useBlocker } from "react-router-dom";
 import type { Note } from "../api/types";
+import { cn } from "../lib/cn";
+import { Button } from "./ui";
 
 export function NoteEditor({
   initial,
@@ -64,10 +66,13 @@ export function NoteEditor({
             : "No note yet";
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">Session note</h3>
-        <span className={`text-xs ${status === "error" ? "text-danger" : "text-muted"}`}>{statusText}</span>
+        <h3 className="text-2xs font-semibold uppercase tracking-[0.08em] text-subtle">Session note</h3>
+        <span className={cn("flex items-center gap-1.5 text-2xs", status === "error" ? "text-danger" : "text-subtle")}>
+          {dirty && status !== "error" ? <span aria-hidden="true" className="size-1.5 rounded-full bg-warn" /> : null}
+          {statusText}
+        </span>
       </div>
       <textarea
         value={text}
@@ -75,41 +80,32 @@ export function NoteEditor({
           setText(event.target.value);
           if (status === "error") setStatus("idle");
         }}
-        rows={6}
-        className="w-full rounded-md border border-line bg-[#10120c] px-3 py-2 text-sm text-ink"
+        rows={5}
+        placeholder="Add context, findings, or follow-ups…"
+        className="block w-full resize-y rounded-md border border-line bg-surface px-3 py-2 text-[13px] leading-relaxed text-ink shadow-card placeholder:text-subtle hover:border-line-strong focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
         aria-label="Session note"
       />
       {error ? <p className="text-xs text-danger">{error}</p> : null}
       {blocker.state === "blocked" ? (
-        <div role="dialog" aria-label="Unsaved note" className="space-y-2 rounded-md border border-line bg-surface2 p-3">
-          <p className="text-sm">Discard unsaved note edits?</p>
+        <div role="dialog" aria-label="Unsaved note" className="space-y-2.5 rounded-md border border-warn/30 bg-warn/[0.06] p-3">
+          <p className="text-[13px]">Discard unsaved note edits?</p>
           <div className="flex gap-2">
-            <button type="button" className="rounded-md border border-line px-3 py-1.5 text-sm" onClick={() => blocker.proceed()}>
+            <Button size="sm" onClick={() => blocker.proceed()}>
               Discard
-            </button>
-            <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-sm text-[#1a1608]" onClick={() => blocker.reset()}>
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => blocker.reset()}>
               Stay
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-[#1a1608] disabled:opacity-50"
-          disabled={!dirty || status === "saving"}
-          onClick={() => void save(text)}
-        >
-          Save
-        </button>
-        <button
-          type="button"
-          className="rounded-md border border-line px-3 py-1.5 text-sm disabled:opacity-50"
-          disabled={status === "saving" || (!text && !savedText)}
-          onClick={clear}
-        >
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" disabled={status === "saving" || (!text && !savedText)} onClick={clear}>
           Clear
-        </button>
+        </Button>
+        <Button size="sm" variant="primary" disabled={!dirty || status === "saving"} onClick={() => void save(text)}>
+          Save
+        </Button>
       </div>
     </div>
   );

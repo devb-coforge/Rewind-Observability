@@ -5,9 +5,24 @@ export function agentLabel(agent: string): string {
   return agent;
 }
 
+export const agentColors: Record<string, string> = {
+  claude_code: "#e08a6a",
+  codex: "#4fc8a8",
+  cursor: "#8b97ff",
+};
+
+export function agentColor(agent: string): string {
+  return agentColors[agent] ?? "#a1a1aa";
+}
+
 export function formatTokens(value: number | null | undefined): string {
   if (value == null) return "—";
   return value.toLocaleString();
+}
+
+export function formatCompact(value: number | null | undefined): string {
+  if (value == null) return "—";
+  return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
 export function formatCost(value: number | null | undefined, partial = false): string {

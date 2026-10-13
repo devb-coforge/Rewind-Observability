@@ -2,73 +2,158 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colors are RGB channels so Tailwind opacity modifiers (bg-danger/10) work. */
 :root {
   color-scheme: dark;
-  --bg: #12140f;
-  --surface: #1b1e16;
-  --surface-2: #24281e;
-  --line: #34392c;
-  --text: #f4f0e6;
-  --muted: #a8a292;
-  --accent: #e2b340;
-  --danger: #e36a58;
-  --ok: #8fbf6a;
+  --bg: 9 9 11;
+  --surface: 17 17 20;
+  --surface-2: 24 24 28;
+  --surface-3: 33 33 38;
+  --line: 38 38 44;
+  --line-strong: 54 54 62;
+  --ink: 236 236 240;
+  --muted: 150 150 160;
+  --subtle: 104 104 114;
+  --accent: 139 151 255;
+  --danger: 244 114 114;
+  --warn: 240 184 76;
+  --ok: 74 208 150;
+  --code: 13 13 16;
+}
+
+*,
+::before,
+::after {
+  border-color: rgb(var(--line));
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01", "ss03";
+  font-size: 14px;
 }
 
 #root {
   min-height: 100vh;
 }
 
+::selection {
+  background: rgb(var(--accent) / 0.3);
+}
+
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: 2px solid rgb(var(--accent) / 0.8);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-.disclosure-arrow {
-  display: inline-block;
-  font-size: 1.1rem;
-  line-height: 1;
-  transition: transform 120ms ease;
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line-strong)) transparent;
 }
 
-.tool-card[open] > summary .disclosure-arrow {
-  transform: rotate(90deg);
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.6);
+  cursor: pointer;
 }
 
-.tool-card > summary::-webkit-details-marker {
+.tool-card > summary::-webkit-details-marker,
+.thinking > summary::-webkit-details-marker {
   display: none;
 }
 
-.md p {
-  margin: 0.35rem 0;
+.tool-card[open] > summary .disclosure,
+.thinking[open] > summary .disclosure {
+  transform: rotate(90deg);
+}
+
+.md {
+  line-height: 1.65;
+}
+
+.md > :first-child {
+  margin-top: 0;
+}
+
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+.md p,
+.md ul,
+.md ol {
+  margin: 0.5rem 0;
+}
+
+.md ul,
+.md ol {
+  padding-left: 1.25rem;
+}
+
+.md ul {
+  list-style: disc;
+}
+
+.md ol {
+  list-style: decimal;
+}
+
+.md li + li {
+  margin-top: 0.2rem;
+}
+
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: 0.9rem 0 0.4rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.md a {
+  color: rgb(var(--accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.md strong {
+  font-weight: 600;
+}
+
+.md blockquote {
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  border-left: 2px solid rgb(var(--line-strong));
+  color: rgb(var(--muted));
 }
 
 .md pre,
 .md code {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
 }
 
 .md pre {
   overflow: auto;
-  background: #10120c;
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.4rem;
+  margin: 0.6rem 0;
+  background: rgb(var(--code));
+  border: 1px solid rgb(var(--line));
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.375rem;
 }
 
 .md :not(pre) > code {
-  background: #10120c;
-  padding: 0.05rem 0.3rem;
+  background: rgb(var(--surface-3));
+  padding: 0.1rem 0.3rem;
   border-radius: 0.25rem;
-}
-
-.md ul {
-  margin: 0.35rem 0;
-  padding-left: 1.2rem;
 }
