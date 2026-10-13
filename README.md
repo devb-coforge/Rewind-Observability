@@ -65,6 +65,8 @@ volumes:
 
 Conversation names and recorded creation dates are imported from the databases; transcript content still comes from JSONL files. Creation dates let Cursor sessions appear in daily charts and date filters. Last-update times are not treated as completion times, so duration stays unknown when the transcript has no end time. Sessions without a recorded creation date remain in the session total but are excluded from daily charts.
 
+Cursor message metadata (`bubbleId:<conversation-id>:<message-id>`, `modelInfo.modelName`) supplies recorded models for session lists and model filters. The current selection (`composerData.modelConfig.modelName`) is shown separately in session details; it is not treated as model history. `default` and `auto` remain unresolved. Rescan refreshes this metadata without reparsing transcripts, and temporarily unavailable databases preserve imported values. Models are not assigned to individual JSONL events because their identities cannot reliably be joined to database messages; token usage and cost remain unknown when absent from the transcript.
+
 ## What is stored where
 
 | Location | Contents |

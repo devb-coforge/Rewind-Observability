@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import json
 from pathlib import Path
 
 from obs.adapters.lineio import to_iso
@@ -79,7 +80,7 @@ class Ingestor:
                     ) if adapter.name == "cursor" else adapter.session_titles(root)
                     if titles is not None:
                         sessions = list(self.store.index.execute(
-                            "SELECT id, native_id, source_path, source_title, started_at FROM sessions WHERE agent = ?",
+                            "SELECT id, native_id, source_path, source_title, started_at, source_models_json, selected_model FROM sessions WHERE agent = ?",
                             (adapter.name,),
                         ))
                         for session in sessions:
@@ -87,6 +88,16 @@ class Ingestor:
                                 continue
                             title = titles.get(session["native_id"])
                             created_at = (metadata or {}).get(session["native_id"], {}).get("started_at")
+                            if metadata is not None:
+                                entry = metadata.get(session["native_id"], {})
+                                models_json = json.dumps(entry.get("models", []))
+                                selected_model = entry.get("selected_model")
+                                if models_json != session["source_models_json"] or selected_model != session["selected_model"]:
+                                    self.store.index.execute(
+                                        "UPDATE sessions SET source_models_json = ?, selected_model = ? WHERE id = ?",
+                                        (models_json, selected_model, session["id"]),
+                                    )
+                                    affected.add(session["id"])
                             if session["started_at"] is None and created_at:
                                 self.store.index.execute(
                                     "UPDATE sessions SET started_at = ? WHERE id = ?",

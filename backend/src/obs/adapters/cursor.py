@@ -31,7 +31,7 @@ class CursorAdapter:
         }
 
     def session_metadata(self, root: Path, user_data_dir: Path | None = None) -> dict[str, dict] | None:
-        """Read conversation names and creation dates from Cursor metadata.
+        """Read names, creation dates and model metadata without importing chat bodies.
 
         Unavailable metadata preserves previously imported names. A readable index
         without a name restores the transcript-derived title.
@@ -73,12 +73,27 @@ class CursorAdapter:
                                     if isinstance(entry, dict):
                                         _save_metadata(metadata, entry.get("composerId"), entry)
                     if "cursorDiskKV" in tables:
-                        # Extract just names inside SQLite rather than loading chat bodies.
-                        for key, name, created_at in db.execute("""
-                            SELECT key, json_extract(value, '$.name'), json_extract(value, '$.createdAt') FROM cursorDiskKV
+                        # Project metadata inside SQLite rather than loading chat bodies.
+                        for key, name, created_at, selected_model in db.execute("""
+                            SELECT key, json_extract(value, '$.name'), json_extract(value, '$.createdAt'),
+                                   json_extract(value, '$.modelConfig.modelName') FROM cursorDiskKV
                             WHERE key LIKE 'composerData:%' AND json_valid(value)
                         """):
-                            _save_metadata(metadata, key.removeprefix("composerData:"), {"name": name, "createdAt": created_at})
+                            _save_metadata(metadata, key.removeprefix("composerData:"), {
+                                "name": name, "createdAt": created_at,
+                                "modelConfig": {"modelName": selected_model},
+                            })
+                        for key, model in db.execute("""
+                            SELECT key, json_extract(value, '$.modelInfo.modelName') FROM cursorDiskKV
+                            WHERE key LIKE 'bubbleId:%' AND json_valid(value)
+                            ORDER BY key
+                        """):
+                            parts = key.split(":")
+                            model = _concrete_model(model)
+                            if len(parts) == 3 and parts[1] and model:
+                                models = metadata.setdefault(parts[1], {}).setdefault("models", [])
+                                if model not in models:
+                                    models.append(model)
                     if "composerHeaders" in tables:
                         for sid, value in db.execute("SELECT composerId, value FROM composerHeaders"):
                             data = json.loads(value)
@@ -87,7 +102,7 @@ class CursorAdapter:
                 finally:
                     db.close()
         except (OSError, sqlite3.Error, ValueError, TypeError):
-            log.warning("could not read Cursor session names from %s", base)
+            log.warning("could not read Cursor session metadata from %s", base)
             return None
         return metadata
 
@@ -171,6 +186,9 @@ def _save_metadata(metadata: dict[str, dict], sid, data: dict) -> None:
     name = data.get("name")
     if isinstance(name, str):
         entry["title"] = name.strip() or None
+    config = data.get("modelConfig")
+    if isinstance(config, dict):
+        entry["selected_model"] = _concrete_model(config.get("modelName"))
     try:
         # createdAt is the recorded conversation creation time. lastUpdatedAt
         # is not an end time and must not become a duration estimate.
@@ -179,3 +197,10 @@ def _save_metadata(metadata: dict[str, dict], sid, data: dict) -> None:
         created = None
     if created is not None:
         entry["started_at"] = to_iso(created)
+
+
+def _concrete_model(value) -> str | None:
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value if value and value.lower() not in {"default", "auto"} else None

@@ -26,9 +26,7 @@ export function Layout() {
       <aside className="flex shrink-0 flex-col border-b border-line bg-surface/60 md:w-56 md:border-b-0 md:border-r">
         <div className="flex h-14 items-center justify-between gap-3 px-4 md:h-auto md:px-4 md:pb-4 md:pt-5">
           <div className="flex items-center gap-2.5">
-            <div aria-hidden="true" className="grid size-7 place-items-center rounded-md bg-gradient-to-b from-ink to-ink/70 shadow-card">
-              <div className="size-2.5 rounded-sm bg-bg" />
-            </div>
+            <img src="/favicon.svg" alt="" aria-hidden="true" className="size-7 rounded-md shadow-card" />
             <div className="leading-tight">
               <div className="text-[13px] font-semibold tracking-tight">Rewind</div>
               <div className="text-2xs text-subtle">Agent transcripts</div>

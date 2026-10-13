@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1c1c24"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <linearGradient id="fg" x1="10" y1="10" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b4bcff"/>
+      <stop offset="1" stop-color="#8b97ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- counter-clockwise rewind arrow -->
+  <g transform="translate(9.6 9.6) scale(1.8)" stroke="url(#fg)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+    <path d="M3 3v5h5"/>
+  </g>
+  <!-- trace waterfall spans -->
+  <rect x="27" y="28" width="13" height="4" rx="2" fill="#8b97ff"/>
+  <rect x="31" y="34" width="13" height="4" rx="2" fill="#8b97ff" opacity="0.75"/>
+  <rect x="28" y="40" width="9" height="4" rx="2" fill="#8b97ff" opacity="0.5"/>
+</svg>

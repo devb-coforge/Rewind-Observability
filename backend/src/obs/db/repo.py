@@ -38,6 +38,10 @@ class Store:
         columns = {row["name"] for row in self.index.execute("PRAGMA table_info(sessions)")}
         if "source_title" not in columns:
             self.index.execute("ALTER TABLE sessions ADD COLUMN source_title TEXT")
+        if "source_models_json" not in columns:
+            self.index.execute("ALTER TABLE sessions ADD COLUMN source_models_json TEXT NOT NULL DEFAULT '[]'")
+        if "selected_model" not in columns:
+            self.index.execute("ALTER TABLE sessions ADD COLUMN selected_model TEXT")
         self.user.executescript(USER_SCHEMA)
         user_tables = {
             row["name"] for row in self.user.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -328,7 +332,7 @@ class Store:
         missing_price = False
         any_usage = False
         last_model = None
-        models: list[str] = []
+        models: list[str] = json.loads(session["source_models_json"] or "[]")
         title = session["source_title"]
         n_user = 0
         n_tools = 0
@@ -705,6 +709,7 @@ class Store:
             "project_hidden": self.is_hidden(row["project_id"]),
             "git_branch": row["git_branch"],
             "models": models,
+            "selected_model": row["selected_model"],
             "parent_session_id": row["parent_session_id"],
             "started_at": row["started_at"],
             "ended_at": row["ended_at"],

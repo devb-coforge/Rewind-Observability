@@ -144,6 +144,10 @@ export function SessionDetailPage() {
             <dd className="mt-1 flex flex-wrap gap-1">
               {detail.models.length ? detail.models.map((model) => <Badge key={model} className="font-mono">{model}</Badge>) : <span className="text-muted">—</span>}
             </dd>
+            {detail.selected_model ? <>
+              <dt className="mt-3 text-subtle">Current model selection</dt>
+              <dd className="mt-1"><Badge className="font-mono">{detail.selected_model}</Badge></dd>
+            </> : null}
           </dl>
         </section>
         <section>

@@ -121,3 +121,67 @@ def test_invalid_metadata_dates_stay_unknown(tmp_path):
             "name": "Title", "createdAt": "invalid", "lastUpdatedAt": 1791810000000,
         })))
     assert CursorAdapter().session_metadata(tmp_path / "cursor", base) == {"session-1": {"title": "Title"}}
+
+
+def test_cursor_models_refresh_filter_rebuild_and_preserve_event_unknowns(tmp_path):
+    root = tmp_path / "cursor"
+    transcript = root / "projects/workspace/agent-transcripts/session-1.jsonl"
+    transcript.parent.mkdir(parents=True)
+    raw = json.dumps({"role": "assistant", "message": {"content": "Reply"}}) + "\n"
+    transcript.write_text(raw)
+    path = root / "user-data/globalStorage/state.vscdb"
+    path.parent.mkdir(parents=True)
+    with sqlite3.connect(path) as db:
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("CREATE TABLE cursorDiskKV(key TEXT PRIMARY KEY, value TEXT)")
+        db.execute("INSERT INTO cursorDiskKV VALUES (?, ?)", ("composerData:session-1", json.dumps({
+            "modelConfig": {"modelName": "current-model"},
+        })))
+        for bubble, model in (("a", "old-model"), ("b", "new-model"), ("c", "old-model"),
+                              ("d", "default"), ("e", "auto"), ("f", 42)):
+            db.execute("INSERT INTO cursorDiskKV VALUES (?, ?)", (
+                f"bubbleId:session-1:{bubble}", json.dumps({"modelInfo": {"modelName": model}}),
+            ))
+        db.execute("INSERT INTO cursorDiskKV VALUES ('bubbleId:session-1:invalid', 'not-json')")
+        db.execute("INSERT INTO cursorDiskKV VALUES (?, ?)", (
+            "bubbleId:other-session:a", json.dumps({"modelInfo": {"modelName": "unrelated"}}),
+        ))
+        db.commit()
+        config = AppConfig(sources=[SourceConfig(path=str(root))], data_dir=tmp_path / "data", ingest_on_startup=False)
+        with TestClient(create_app(config)) as client:
+            client.post("/api/reindex")
+            session = client.get("/api/sessions/cursor:session-1").json()
+            assert session["models"] == ["old-model", "new-model"]
+            assert session["selected_model"] == "current-model"
+            assert session["tokens_in"] is None and session["est_cost_usd"] is None
+            assert len(client.get("/api/sessions?model=old-model").json()["sessions"]) == 1
+            assert client.get("/api/sessions?model=current-model").json()["sessions"] == []
+            events = client.get("/api/sessions/cursor:session-1/events").json()["events"]
+            assert all(e["model"] is None for e in events)
+            # Metadata refresh must work with unchanged transcripts and the live WAL.
+            db.execute("UPDATE cursorDiskKV SET value=? WHERE key='bubbleId:session-1:a'", (
+                json.dumps({"modelInfo": {"modelName": "updated-model"}}),
+            ))
+            db.commit()
+            assert client.post("/api/reindex").json()["files_parsed"] == 0
+            expected = ["updated-model", "new-model", "old-model"]
+            assert client.get("/api/sessions/cursor:session-1").json()["models"] == expected
+            client.post("/api/reindex?full=true")
+            assert client.get("/api/sessions/cursor:session-1").json()["models"] == expected
+            assert client.get("/api/sessions/cursor:session-1/events").json()["events"] == events
+            db.execute("ALTER TABLE cursorDiskKV RENAME TO savedKV")
+            db.execute("CREATE TABLE cursorDiskKV(unrecognized TEXT)")
+            db.commit()
+            # Also trigger recomputation while metadata is unavailable.
+            transcript.write_text(raw + json.dumps({"role": "user", "message": {"content": "More"}}) + "\n")
+            client.post("/api/reindex")
+            assert client.get("/api/sessions/cursor:session-1").json()["models"] == expected
+            db.execute("DROP TABLE cursorDiskKV")
+            db.execute("ALTER TABLE savedKV RENAME TO cursorDiskKV")
+            db.execute("DELETE FROM cursorDiskKV WHERE key LIKE 'bubbleId:%'")
+            db.execute("UPDATE cursorDiskKV SET value=?", (json.dumps({"modelConfig": {"modelName": "default"}}),))
+            db.commit()
+            client.post("/api/reindex")
+            session = client.get("/api/sessions/cursor:session-1").json()
+            assert session["models"] == [] and session["selected_model"] is None
+            assert client.get("/api/sessions?model=old-model").json()["sessions"] == []
