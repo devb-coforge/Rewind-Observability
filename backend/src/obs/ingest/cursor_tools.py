@@ -9,7 +9,7 @@ import hashlib
 import json
 import re
 
-from obs.adapters.lineio import preview
+from obs.shared.lineio import preview
 from obs.tool_outcomes import user_declined
 
 NAMES = {

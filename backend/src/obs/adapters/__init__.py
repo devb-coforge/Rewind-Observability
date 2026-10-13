@@ -1,11 +1,12 @@
 from obs.adapters.claude_code import ClaudeCodeAdapter
 from obs.adapters.codex import CodexAdapter
 from obs.adapters.cursor import CursorAdapter
+from obs.adapters.interface import Adapter
 
-ADAPTERS = (ClaudeCodeAdapter(), CodexAdapter(), CursorAdapter())
+ADAPTERS: tuple[Adapter, ...] = (ClaudeCodeAdapter(), CodexAdapter(), CursorAdapter())
 
 
-def adapter_by_name(name: str):
+def adapter_by_name(name: str) -> Adapter:
     for adapter in ADAPTERS:
         if adapter.name == name:
             return adapter

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import fnmatch
 import os
-from pathlib import Path
 
 
 def discover_files(base: Path, pattern: str) -> list[Path]:

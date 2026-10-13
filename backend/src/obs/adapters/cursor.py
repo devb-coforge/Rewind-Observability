@@ -10,20 +10,30 @@ import os
 import sqlite3
 import sys
 
-from obs.adapters.claude_code import _blocks, _usage
-from obs.adapters.detect import infer_agent_from_path
-from obs.adapters.lineio import complete_lines, loads_obj, parse_ts, stringify, to_iso
-from obs.models import ParsedEvent, ParseResult
+from obs.adapters.interface import MetadataSnapshot
+from obs.models import AgentName, ParsedEvent, ParseResult
+from obs.shared.detect import infer_agent_from_path
+from obs.shared.lineio import complete_lines, loads_obj, parse_ts, stringify, to_iso
+from obs.shared.transcripts import parse_content_blocks, parse_message_usage
 
 log = logging.getLogger(__name__)
 
 
 class CursorAdapter:
-    name = "cursor"
+    name: AgentName = "cursor"
     version = 2
 
     def detect(self, root: Path) -> bool:
         return infer_agent_from_path(root) == self.name
+
+    def read_metadata(self, root: Path, user_data_dir: Path | None = None) -> MetadataSnapshot | None:
+        entries = self.session_metadata(root, user_data_dir)
+        if entries is None:
+            return None
+        return MetadataSnapshot(
+            titles={sid: entry.get("title") for sid, entry in entries.items()},
+            entries=entries,
+        )
 
     def session_titles(self, root: Path, user_data_dir: Path | None = None) -> dict[str, str] | None:
         metadata = self.session_metadata(root, user_data_dir)
@@ -177,9 +187,9 @@ class CursorAdapter:
             model = model if isinstance(model, str) else None
             if model:
                 result.models.append(model)
-            usage = _usage(message.get("usage")) if isinstance(message, dict) else None
+            usage = parse_message_usage(message.get("usage")) if isinstance(message, dict) else None
             if role in ("user", "assistant") and isinstance(message, dict):
-                blocks = _blocks(message.get("content"), role)
+                blocks = parse_content_blocks(message.get("content"), role)
             elif obj and obj.get("type") == "turn_ended":
                 status = obj.get("status")
                 blocks = [{

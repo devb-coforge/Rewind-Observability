@@ -3,10 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 import logging
 
-from obs.adapters.detect import infer_agent_from_path
-from obs.adapters.discovery import discover_files
-from obs.adapters.lineio import complete_lines, int_or_none, loads_obj, parse_ts, stringify
-from obs.models import ParsedEvent, ParseResult, Usage
+from obs.adapters.interface import MetadataSnapshot
+from obs.models import AgentName, ParsedEvent, ParseResult
+from obs.shared.detect import infer_agent_from_path
+from obs.shared.discovery import discover_files
+from obs.shared.lineio import complete_lines, loads_obj, parse_ts, stringify
+from obs.shared.transcripts import parse_content_blocks, parse_message_usage
 
 
 # Session bookkeeping records are not conversation turns. In particular,
@@ -25,19 +27,13 @@ _BOOKKEEPING_TYPES = {
 log = logging.getLogger(__name__)
 
 
-def title_prompt(text: str) -> str | None:
-    """Local CLI notices and slash commands are context, not session names."""
-    cleaned = text.strip()
-    if cleaned.startswith(("<local-command-caveat>", "<local-command-stdout>",
-                           "<local-command-stderr>", "<command-name>",
-                           "<command-message>")):
-        return None
-    return " ".join(cleaned.split())[:120] or None
-
-
 class ClaudeCodeAdapter:
-    name = "claude_code"
+    name: AgentName = "claude_code"
     version = 4
+
+    def read_metadata(self, root: Path, user_data_dir: Path | None = None) -> MetadataSnapshot | None:
+        titles = self.session_titles(root)
+        return None if titles is None else MetadataSnapshot(titles=titles)
 
     def session_titles(self, root: Path) -> dict[str, str] | None:
         ai_titles: dict[str, str] = {}
@@ -234,8 +230,8 @@ class ClaudeCodeAdapter:
         if model:
             models.append(model)
         message_id = message.get("id") if isinstance(message.get("id"), str) else None
-        usage = _usage(message.get("usage"))
-        blocks = _blocks(message.get("content"), typ)
+        usage = parse_message_usage(message.get("usage"))
+        blocks = parse_content_blocks(message.get("content"), typ)
         for index, block in enumerate(blocks):
             result.events.append(
                 ParsedEvent(
@@ -259,88 +255,3 @@ class ClaudeCodeAdapter:
                     raw_length=length,
                 )
             )
-
-
-def _usage(raw) -> Usage | None:
-    if not isinstance(raw, dict):
-        return None
-    usage = Usage(
-        input_tokens=int_or_none(raw.get("input_tokens")),
-        output_tokens=int_or_none(raw.get("output_tokens")),
-        cache_read_tokens=int_or_none(
-            raw.get("cache_read_input_tokens", raw.get("cache_read_tokens"))
-        ),
-        cache_write_tokens=int_or_none(
-            raw.get("cache_creation_input_tokens", raw.get("cache_write_tokens"))
-        ),
-    )
-    return usage if usage.known() else None
-
-
-def _blocks(content, typ: str) -> list[dict]:
-    if isinstance(content, str):
-        return [{"role": "user" if typ == "user" else "assistant", "kind": "message", "text": content}]
-    if not isinstance(content, list):
-        return [{"role": "system", "kind": "unknown", "text": None}]
-    blocks: list[dict] = []
-    for item in content:
-        if isinstance(item, str):
-            blocks.append(
-                {
-                    "role": "user" if typ == "user" else "assistant",
-                    "kind": "message",
-                    "text": item,
-                }
-            )
-            continue
-        if not isinstance(item, dict):
-            blocks.append({"role": "system", "kind": "unknown", "text": None})
-            continue
-        btype = item.get("type")
-        if btype == "text":
-            blocks.append(
-                {
-                    "role": "user" if typ == "user" else "assistant",
-                    "kind": "message",
-                    "text": item.get("text") if isinstance(item.get("text"), str) else "",
-                }
-            )
-        elif btype == "thinking":
-            thinking = item.get("thinking")
-            if not isinstance(thinking, str):
-                thinking = item.get("text") if isinstance(item.get("text"), str) else None
-            blocks.append({"role": "assistant", "kind": "thinking", "text": thinking})
-        elif btype == "tool_use":
-            tool_input = item.get("input") if isinstance(item.get("input"), dict) else {}
-            blocks.append(
-                {
-                    "role": "assistant",
-                    "kind": "tool_call",
-                    "tool_name": item.get("name") if isinstance(item.get("name"), str) else None,
-                    "tool_call_id": item.get("id") if isinstance(item.get("id"), str) else None,
-                    "tool_input": tool_input,
-                }
-            )
-        elif btype == "tool_result":
-            blocks.append(
-                {
-                    "role": "tool",
-                    "kind": "tool_result",
-                    "tool_call_id": item.get("tool_use_id")
-                    if isinstance(item.get("tool_use_id"), str)
-                    else None,
-                    "tool_output": stringify(item.get("content")),
-                    "is_error": bool(item.get("is_error")),
-                }
-            )
-        else:
-            blocks.append(
-                {
-                    "role": "system",
-                    "kind": "unknown",
-                    "text": stringify(item)[:2000],
-                }
-            )
-    if not blocks:
-        blocks.append({"role": "system", "kind": "unknown", "text": None})
-    return blocks

@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 
 from obs.analytics.stats import median_or_none
-from obs.db.repo import Store, _escape_like
+from obs.db.repo import Store
+from obs.db.sql import escape_like
 
 _FTS_TERM = re.compile(r"[\w./:+-]{2,}")
 
@@ -24,7 +25,7 @@ def search(store: Store, *, q: str, agent: str | None, project: str | None, incl
         "project": project,
         "include_hidden": include_hidden,
     }
-    where, params = store._session_filters(filters)
+    where, params = store.session_filters(filters)
     rows = store.index.execute(
         f"""
         SELECT e.id AS event_id, e.session_id, e.seq, e.kind, e.ts,
@@ -67,7 +68,7 @@ def failed_tools(
     declined: bool = False,
     offset: int = 0,
 ) -> dict:
-    where, params = store._session_filters(
+    where, params = store.session_filters(
         {"agent": agent, "project": project, "include_hidden": include_hidden}
     )
     outcome = "r.is_declined = 1" if declined else "r.is_error = 1 AND r.is_declined = 0"
@@ -94,7 +95,7 @@ def failed_tools(
         extra += " AND COALESCE(c.tool_name, r.tool_name, 'unknown') = ?"
         extra_params.append(tool)
     if q:
-        like = f"%{_escape_like(q)}%"
+        like = f"%{escape_like(q)}%"
         extra += (
             " AND (COALESCE(r.tool_output_preview, '') LIKE ? ESCAPE '\\'"
             " OR COALESCE(c.tool_input_json, '') LIKE ? ESCAPE '\\')"
@@ -124,7 +125,7 @@ def failed_tools(
 
 
 def summary(store: Store, filters: dict) -> dict:
-    where, params = store._session_filters(filters)
+    where, params = store.session_filters(filters)
     row = store.index.execute(
         f"""
         SELECT
@@ -146,7 +147,7 @@ def summary(store: Store, filters: dict) -> dict:
         """,
         params,
     ).fetchone()
-    from obs.db.repo import _duration
+    from obs.analytics.duration import duration_seconds
 
     seconds = []
     for item in store.index.execute(
@@ -154,7 +155,7 @@ def summary(store: Store, filters: dict) -> dict:
     ):
         value = item["source_duration_sec"]
         if value is None:
-            value = _duration(item["started_at"], item["ended_at"])
+            value = duration_seconds(item["started_at"], item["ended_at"])
         if value is not None:
             seconds.append(value)
     sessions = row["sessions"] or 0
@@ -188,7 +189,7 @@ def summary(store: Store, filters: dict) -> dict:
 
 
 def timeseries(store: Store, filters: dict, *, metric: str, bucket: str, group_by: str | None) -> dict:
-    where, params = store._session_filters(filters)
+    where, params = store.session_filters(filters)
     bucket_expr = "substr(s.started_at, 1, 10)" if bucket != "week" else _week_expr("s.started_at")
     if group_by == "model":
         group_expr = "m.model"
@@ -232,7 +233,7 @@ def timeseries(store: Store, filters: dict, *, metric: str, bucket: str, group_b
 
 
 def tools(store: Store, filters: dict) -> dict:
-    where, params = store._session_filters(filters)
+    where, params = store.session_filters(filters)
     rows = store.index.execute(
         f"""
         WITH filtered AS (
