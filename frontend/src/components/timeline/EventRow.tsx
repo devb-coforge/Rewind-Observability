@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { Bot, ChevronRight, FileText, HelpCircle, Settings2, User } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import Markdown from "react-markdown";
 import type { ObsEvent } from "../../api/types";
+import { cn } from "../../lib/cn";
 import { formatTime } from "../../lib/format";
+import { Badge } from "../ui";
 import { ThinkingBlock } from "./ThinkingBlock";
 
 export function EventRow({
@@ -21,12 +24,11 @@ export function EventRow({
   const open = expanded ?? localExpanded ?? Boolean(focused);
   const system = event.kind === "system" || event.role === "system" || event.role === "developer";
   const outside = event.paths?.some((item) => item.outside && !item.allowed);
-  const ring = focused ? "ring-1 ring-accent" : "";
-  const edge = outside ? "border-l-2 border-l-danger" : "";
+  const ring = focused ? "ring-1 ring-accent/70 ring-offset-2 ring-offset-bg" : "";
 
   if (event.kind === "thinking") {
     return (
-      <div className={ring}>
+      <div className={cn("rounded-lg", ring)}>
         <ThinkingBlock text={event.text} expanded={open} onExpandedChange={onExpandedChange || setLocalExpanded} />
       </div>
     );
@@ -46,49 +48,88 @@ export function EventRow({
               : event.role;
 
   const body = event.role === "assistant" && event.kind === "message" ? (
-    <div className="md break-words text-sm"><Markdown>{event.text || ""}</Markdown></div>
+    <div className="md break-words text-[13px] text-ink/90"><Markdown>{event.text || ""}</Markdown></div>
   ) : (
-    <p className="whitespace-pre-wrap break-words text-sm">{event.text || (event.kind === "unknown" ? "(unparsed line)" : "No message content.")}</p>
+    <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-ink/90">
+      {event.text || (event.kind === "unknown" ? "(unparsed line)" : "No message content.")}
+    </p>
+  );
+
+  const flags = (
+    <>
+      {outside ? <Badge tone="warn">outside project</Badge> : null}
+      {event.is_error ? <Badge tone="danger">error</Badge> : null}
+    </>
+  );
+  const rawButton = (
+    <button
+      type="button"
+      className="shrink-0 rounded px-1.5 py-0.5 text-2xs font-medium text-subtle transition-colors hover:bg-surface3 hover:text-ink"
+      onClick={() => onRaw(event.id)}
+    >
+      View raw
+    </button>
   );
 
   if (system) {
     return (
-      <article className={`rounded-lg border border-line bg-surface/60 ${edge} ${ring}`}>
-        <div className="flex items-center gap-2 px-3 py-2">
+      <article className={cn("rounded-lg border border-dashed border-line-strong/70 bg-surface/40", outside && "border-warn/40", ring)}>
+        <div className="flex items-center gap-2 px-3 py-1.5">
           <button
             type="button"
-            className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs text-muted"
+            className="flex min-w-0 flex-1 items-center gap-2 py-0.5 text-left text-xs text-muted hover:text-ink"
             aria-expanded={open}
             aria-label={`${open ? "Collapse" : "Expand"} ${role.toLowerCase()} message`}
             onClick={() => (onExpandedChange || setLocalExpanded)(!open)}
           >
-            <span aria-hidden="true" className={`disclosure-arrow ${open ? "rotate-90" : ""}`}>›</span>
-            <span className="shrink-0 uppercase tracking-wide">{role}</span>
-            <span className="shrink-0">{formatTime(event.ts)}</span>
-            {!open ? <span className="truncate">{event.text?.replace(/\s+/g, " ").trim().slice(0, 180) || "No message content."}</span> : null}
+            <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-subtle transition-transform", open && "rotate-90")} />
+            <Settings2 aria-hidden="true" className="size-3.5 shrink-0 text-subtle" />
+            <span className="shrink-0 font-medium">{role}</span>
+            <span className="shrink-0 tabular-nums text-subtle">{formatTime(event.ts)}</span>
+            {!open ? (
+              <span className="truncate text-subtle">
+                {event.text?.replace(/\s+/g, " ").trim().slice(0, 180) || "No message content."}
+              </span>
+            ) : null}
           </button>
-          {outside ? <span className="text-xs text-danger">outside project</span> : null}
-          {event.is_error ? <span className="text-xs text-danger">error</span> : null}
-          <button type="button" className="shrink-0 text-xs text-muted hover:text-ink" onClick={() => onRaw(event.id)}>View raw</button>
+          {flags}
+          {rawButton}
         </div>
-        {open ? <div className="border-t border-line px-3 py-3">{body}</div> : null}
+        {open ? <div className="border-t border-dashed border-line-strong/70 px-4 py-3">{body}</div> : null}
       </article>
     );
   }
 
+  const user = event.role === "user";
   return (
-    <article className={`rounded-lg border border-line bg-surface px-3 py-2 ${event.role === "user" ? "border-l-2 border-l-accent" : ""} ${edge} ${ring}`}>
-      <header className="mb-1 flex items-center gap-2 text-xs text-muted">
-        <span className="uppercase tracking-wide">{role}</span>
-        <span>{formatTime(event.ts)}</span>
-        {event.model ? <span className="truncate">{event.model}</span> : null}
-        {outside ? <span className="text-danger">outside project</span> : null}
-        {event.is_error ? <span className="text-danger">error</span> : null}
-        <button type="button" className="ml-auto underline-offset-2 hover:underline" onClick={() => onRaw(event.id)}>
-          View raw
-        </button>
+    <article
+      className={cn(
+        "rounded-lg border px-4 py-3",
+        user ? "border-accent/20 bg-accent/[0.05]" : "border-line bg-surface",
+        outside && "border-l-2 border-l-warn",
+        ring,
+      )}
+    >
+      <header className="mb-1.5 flex items-center gap-2 text-xs">
+        <RoleIcon role={role} />
+        <span className={cn("font-medium", user ? "text-accent" : "text-ink")}>{role}</span>
+        <span className="tabular-nums text-subtle">{formatTime(event.ts)}</span>
+        {event.model ? <span className="truncate font-mono text-2xs text-subtle">{event.model}</span> : null}
+        <span className="ml-auto flex items-center gap-1.5">
+          {flags}
+          {rawButton}
+        </span>
       </header>
       {body}
     </article>
   );
+}
+
+function RoleIcon({ role }: { role: string }) {
+  const icons: Record<string, ReactNode> = {
+    You: <User className="size-3.5 text-accent" />,
+    Assistant: <Bot className="size-3.5 text-muted" />,
+    Summary: <FileText className="size-3.5 text-muted" />,
+  };
+  return <span aria-hidden="true">{icons[role] ?? <HelpCircle className="size-3.5 text-subtle" />}</span>;
 }

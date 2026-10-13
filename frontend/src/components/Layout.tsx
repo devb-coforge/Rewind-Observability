@@ -1,16 +1,20 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { NavLink, Outlet } from "react-router-dom";
+import { BarChart3, Database, FlaskConical, List, RefreshCw, Search } from "lucide-react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../api/client";
+import { cn } from "../lib/cn";
+import { Button } from "./ui";
 
 const links = [
-  { to: "/", label: "Sessions", end: true },
-  { to: "/analytics", label: "Analytics", end: false },
-  { to: "/search", label: "Search", end: false },
-  { to: "/benchmark", label: "Benchmark", end: false },
-  { to: "/sources", label: "Sources", end: false },
+  { to: "/", label: "Sessions", end: true, icon: List },
+  { to: "/analytics", label: "Analytics", end: false, icon: BarChart3 },
+  { to: "/search", label: "Search", end: false, icon: Search },
+  { to: "/benchmark", label: "Benchmark", end: false, icon: FlaskConical },
+  { to: "/sources", label: "Sources", end: false, icon: Database },
 ];
 
 export function Layout() {
+  const { pathname } = useLocation();
   const queryClient = useQueryClient();
   const rescan = useMutation({
     mutationFn: () => api.reindex(false),
@@ -18,40 +22,59 @@ export function Layout() {
   });
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-4">
-        <div>
-          <div className="text-sm font-semibold tracking-wide">Obs</div>
-          <div className="text-xs text-muted">Local agent transcripts</div>
+    <div className="flex h-screen flex-col md:flex-row">
+      <aside className="flex shrink-0 flex-col border-b border-line bg-surface/60 md:w-56 md:border-b-0 md:border-r">
+        <div className="flex h-14 items-center justify-between gap-3 px-4 md:h-auto md:px-4 md:pb-4 md:pt-5">
+          <div className="flex items-center gap-2.5">
+            <div aria-hidden="true" className="grid size-7 place-items-center rounded-md bg-gradient-to-b from-ink to-ink/70 shadow-card">
+              <div className="size-2.5 rounded-sm bg-bg" />
+            </div>
+            <div className="leading-tight">
+              <div className="text-[13px] font-semibold tracking-tight">Obs</div>
+              <div className="text-2xs text-subtle">Agent transcripts</div>
+            </div>
+          </div>
+          <Button size="sm" className="md:hidden" disabled={rescan.isPending} onClick={() => rescan.mutate()}>
+            <RefreshCw aria-hidden="true" className={cn("size-3.5", rescan.isPending && "animate-spin")} />
+            {rescan.isPending ? "Scanning…" : "Rescan"}
+          </Button>
         </div>
-        <button
-          type="button"
-          className="rounded-md border border-line px-3 py-1.5 text-sm disabled:opacity-50"
-          disabled={rescan.isPending}
-          onClick={() => rescan.mutate()}
-        >
-          {rescan.isPending ? "Scanning…" : "Rescan"}
-        </button>
-      </header>
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line px-2 py-2 md:w-44 md:flex-col md:border-b-0 md:border-r md:px-3 md:py-4">
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.end}
-              className={({ isActive }) =>
-                `rounded-md px-3 py-2 text-sm ${isActive ? "bg-surface2 text-accent" : "text-muted hover:text-ink"}`
-              }
-            >
-              {link.label}
-            </NavLink>
-          ))}
+        <nav className="flex gap-0.5 overflow-x-auto px-2 pb-2 md:flex-1 md:flex-col md:px-3 md:pb-0">
+          {links.map(({ to, label, end, icon: Icon }) => {
+            const inSession = to === "/" && pathname.startsWith("/sessions/");
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  cn(
+                    "group flex h-8 shrink-0 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                    isActive || inSession ? "bg-surface3 text-ink shadow-card" : "text-muted hover:bg-surface2 hover:text-ink",
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon aria-hidden="true" className={cn("size-4", isActive || inSession ? "text-ink" : "text-subtle group-hover:text-muted")} />
+                    {label}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
         </nav>
-        <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-          <Outlet />
-        </main>
-      </div>
+        <div className="hidden border-t border-line p-3 md:block">
+          <Button className="w-full" disabled={rescan.isPending} onClick={() => rescan.mutate()}>
+            <RefreshCw aria-hidden="true" className={cn("size-3.5", rescan.isPending && "animate-spin")} />
+            {rescan.isPending ? "Scanning…" : "Rescan"}
+          </Button>
+          {rescan.isError ? <p className="mt-2 text-2xs text-danger">{(rescan.error as Error).message}</p> : null}
+        </div>
+      </aside>
+      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        <Outlet />
+      </main>
     </div>
   );
 }
