@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+from datetime import datetime
 from pathlib import Path
 
 from obs.adapters.detect import infer_agent_from_path
@@ -10,6 +12,7 @@ from obs.models import ParsedEvent, ParseResult, Usage
 
 _TOOL_WRAP = re.compile(r"^text\(await tools\.([A-Za-z0-9_]+)\(", re.DOTALL)
 _EXIT_CODE = re.compile(r"Exit code:\s*(\d+)")
+log = logging.getLogger(__name__)
 
 
 class CodexAdapter:
@@ -24,6 +27,43 @@ class CodexAdapter:
             return []
         base = root / "sessions" if (root / "sessions").is_dir() else root
         return sorted(path for path in base.rglob("rollout-*.jsonl") if path.is_file())
+
+    def session_titles(self, root: Path) -> dict[str, str] | None:
+        """Read Codex's conversation names without opening its internal state database.
+
+        None means the index could not be read; preserve previously imported names.
+        A missing index is normal for transcript-only sources.
+        """
+        path = root / "session_index.jsonl"
+        try:
+            lines = path.read_bytes().splitlines()
+        except FileNotFoundError:
+            return {}
+        except OSError:
+            log.warning("could not read Codex session names from %s", path)
+            return None
+        titles: dict[str, str] = {}
+        updated: dict[str, datetime | None] = {}
+        for line in lines:
+            entry, ok = loads_obj(line)
+            if not ok or entry is None:
+                continue
+            sid, name = entry.get("id"), entry.get("thread_name")
+            if not isinstance(sid, str) or not sid or not isinstance(name, str):
+                continue
+            try:
+                stamp = parse_ts(entry.get("updated_at"))
+            except (ValueError, OverflowError, OSError):
+                stamp = None
+            previous = updated.get(sid)
+            if stamp is not None and previous is not None and stamp < previous:
+                continue
+            updated[sid] = stamp
+            if name.strip():
+                titles[sid] = name.strip()
+            else:
+                titles.pop(sid, None)
+        return titles
 
     def native_id_from_path(self, path: Path) -> str | None:
         stem = path.stem

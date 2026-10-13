@@ -26,6 +26,26 @@ body {
   min-height: 100vh;
 }
 
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.disclosure-arrow {
+  display: inline-block;
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.tool-card[open] > summary .disclosure-arrow {
+  transform: rotate(90deg);
+}
+
+.tool-card > summary::-webkit-details-marker {
+  display: none;
+}
+
 .md p {
   margin: 0.35rem 0;
 }

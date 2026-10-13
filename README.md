@@ -35,6 +35,8 @@ Indexed files outside the configured source roots are removed on every rescan, s
 
 A rescan reads appended bytes. **Full rebuild** on the Sources page reparses every file. Rebuilding the index does not delete notes, hidden-project preferences, path allows, or benchmark cases.
 
+Codex conversation names are imported from `session_index.jsonl` in each configured Codex source root (normally `~/.codex`). Rescan refreshes renamed conversations even when their transcripts have not changed. Sources containing only transcripts use the first user message as the title. The Codex index is read-only; the app does not open Codex's internal state database.
+
 ## What is stored where
 
 | Location | Contents |

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   started_at TEXT,
   ended_at TEXT,
   title TEXT,
+  source_title TEXT,
   n_events INTEGER NOT NULL DEFAULT 0,
   n_user_msgs INTEGER NOT NULL DEFAULT 0,
   n_tool_calls INTEGER NOT NULL DEFAULT 0,

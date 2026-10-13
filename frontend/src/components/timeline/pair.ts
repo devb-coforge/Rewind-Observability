@@ -4,6 +4,25 @@ export type TimelineItem =
   | { type: "single"; event: ObsEvent }
   | { type: "tool"; call: ObsEvent; result?: ObsEvent };
 
+export type TimelineView = "all" | "conversation" | "tools" | "errors";
+
+export function matchesView(item: TimelineItem, view: TimelineView): boolean {
+  if (view === "all") return true;
+  if (view === "errors") {
+    return item.type === "tool" ? item.call.is_error || Boolean(item.result?.is_error) : item.event.is_error;
+  }
+  if (view === "tools") {
+    return item.type === "tool" || ["tool_call", "tool_result"].includes(item.event.kind);
+  }
+  return item.type === "single" && (item.event.kind === "summary" ||
+    (item.event.kind === "message" && ["user", "assistant"].includes(item.event.role)));
+}
+
+export function filterTimeline(items: TimelineItem[], view: TimelineView, showThinking: boolean, focusId?: string | null): TimelineItem[] {
+  return items.filter((item) => (focusId && itemMatches(item, focusId)) ||
+    (matchesView(item, view) && (showThinking || item.type === "tool" || item.event.kind !== "thinking")));
+}
+
 export function pairEvents(events: ObsEvent[]): TimelineItem[] {
   const results = new Map<string, ObsEvent>();
   for (const event of events) {

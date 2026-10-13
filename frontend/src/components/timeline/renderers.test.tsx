@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ObsEvent } from "../../api/types";
 import { DiffView } from "./DiffView";
 import { EventRow } from "./EventRow";
@@ -28,6 +28,34 @@ function event(partial: Partial<ObsEvent> & Pick<ObsEvent, "id" | "kind">): ObsE
 }
 
 describe("event renderers", () => {
+  it.each([
+    { kind: "system", role: "assistant", label: "system" },
+    { kind: "message", role: "system", label: "system" },
+    { kind: "message", role: "developer", label: "developer" },
+  ])("collapses $label context with a preview and keyboard disclosure", async ({ kind, role, label }) => {
+    const user = userEvent.setup();
+    const raw = vi.fn();
+    const text = `Context preview\n${"Long instructions. ".repeat(30)}End of instructions`;
+    render(<EventRow event={event({ id: "s", kind, role, text })} onRaw={raw} />);
+    const toggle = screen.getByRole("button", { name: `Expand ${label} message` });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText(/^Context preview/)).toHaveClass("truncate");
+    expect(screen.queryByText(/End of instructions/)).toBeNull();
+    toggle.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: `Collapse ${label} message` })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/End of instructions/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "View raw" }));
+    expect(raw).toHaveBeenCalledWith("s");
+    await user.click(screen.getByRole("button", { name: `Collapse ${label} message` }));
+    expect(screen.queryByText(/End of instructions/)).toBeNull();
+  });
+
+  it("reveals a focused system message", () => {
+    render(<EventRow event={event({ id: "s", kind: "system", text: "Instructions" })} focused onRaw={() => undefined} />);
+    expect(screen.getByRole("button", { name: "Collapse system message" })).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("shows a shell command in the summary and keeps output collapsed", () => {
     render(
       <ToolCallCard

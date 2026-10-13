@@ -34,6 +34,9 @@ class Store:
         self.index = connect(self.index_path)
         self.user = connect(self.user_path)
         self.index.executescript(SCHEMA)
+        columns = {row["name"] for row in self.index.execute("PRAGMA table_info(sessions)")}
+        if "source_title" not in columns:
+            self.index.execute("ALTER TABLE sessions ADD COLUMN source_title TEXT")
         self.user.executescript(USER_SCHEMA)
         self.index.commit()
         self.user.commit()
@@ -315,7 +318,7 @@ class Store:
         any_usage = False
         last_model = None
         models: list[str] = []
-        title = None
+        title = session["source_title"]
         n_user = 0
         n_tools = 0
         error_result_ids: set[str] = set()

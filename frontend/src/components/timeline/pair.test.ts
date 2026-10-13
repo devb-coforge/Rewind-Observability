@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ObsEvent } from "../../api/types";
-import { pairEvents } from "./pair";
+import { filterTimeline, itemKey, pairEvents } from "./pair";
 
 function event(partial: Partial<ObsEvent> & Pick<ObsEvent, "id" | "kind">): ObsEvent {
   return {
@@ -24,6 +24,36 @@ function event(partial: Partial<ObsEvent> & Pick<ObsEvent, "id" | "kind">): ObsE
 }
 
 describe("pairEvents", () => {
+  it("filters conversation, tools, and errors while retaining failed tool results", () => {
+    const items = pairEvents([
+      event({ id: "s", kind: "system" }),
+      event({ id: "u", kind: "message", role: "user" }),
+      event({ id: "a", kind: "message" }),
+      event({ id: "c", kind: "tool_call", tool_call_id: "1" }),
+      event({ id: "r", kind: "tool_result", tool_call_id: "1", is_error: true }),
+      event({ id: "orphan", kind: "tool_result" }),
+      event({ id: "t", kind: "thinking" }),
+      event({ id: "summary", kind: "summary" }),
+    ]);
+    expect(filterTimeline(items, "conversation", false).map(itemKey)).toEqual(["u", "a", "summary"]);
+    expect(filterTimeline(items, "tools", false).map(itemKey)).toEqual(["c", "orphan"]);
+    expect(filterTimeline(items, "errors", false).map(itemKey)).toEqual(["c"]);
+    expect(filterTimeline(items, "all", false).map(itemKey)).not.toContain("t");
+    expect(filterTimeline(items, "all", true).map(itemKey)).toContain("t");
+  });
+
+  it("keeps linked context and tool results accessible through filters", () => {
+    const items = pairEvents([
+      event({ id: "s", kind: "system" }),
+      event({ id: "t", kind: "thinking" }),
+      event({ id: "c", kind: "tool_call", tool_call_id: "1" }),
+      event({ id: "r", kind: "tool_result", tool_call_id: "1" }),
+    ]);
+    expect(filterTimeline(items, "conversation", false, "s").map(itemKey)).toEqual(["s"]);
+    expect(filterTimeline(items, "all", false, "t").map(itemKey)).toContain("t");
+    expect(filterTimeline(items, "conversation", false, "r").map(itemKey)).toEqual(["c"]);
+  });
+
   it("pairs a tool call with its result and keeps other events", () => {
     const items = pairEvents([
       event({ id: "u", kind: "message", role: "user", text: "go", seq: 0 }),

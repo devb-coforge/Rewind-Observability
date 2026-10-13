@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from obs.adapters.codex import CodexAdapter, interpret_tool
 
@@ -43,3 +44,22 @@ def test_interpret_exec_command_and_apply_patch():
 
 def test_detects_sessions_root():
     assert CodexAdapter().detect(FIXTURE.parents[4])
+
+
+def test_session_names_use_latest_valid_entry_and_ignore_partial_lines(tmp_path):
+    entries = [
+        {"id": "one", "thread_name": "Current name", "updated_at": "2026-10-12T12:00:00Z"},
+        {"id": "one", "thread_name": "Old name", "updated_at": "2026-10-12T11:00:00Z"},
+        {"id": "two", "thread_name": "Other conversation"},
+        {"id": "two", "thread_name": "  "},
+        {"id": "three", "thread_name": "  Third conversation  "},
+        {"id": "bad", "thread_name": 42},
+    ]
+    (tmp_path / "session_index.jsonl").write_text(
+        "\n".join(json.dumps(entry) for entry in entries) + '\nnot-json\n{"id":'
+    )
+    assert CodexAdapter().session_titles(tmp_path) == {"one": "Current name", "three": "Third conversation"}
+
+
+def test_missing_session_index_is_supported(tmp_path):
+    assert CodexAdapter().session_titles(tmp_path) == {}

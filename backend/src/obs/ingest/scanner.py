@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from obs.adapters import adapter_by_name
@@ -8,7 +9,7 @@ from obs.config import SourceConfig
 
 
 def source_root(source: SourceConfig) -> Path:
-    return Path(source.path).expanduser()
+    return Path(os.path.expandvars(source.path)).expanduser()
 
 
 def resolve_agent(source: SourceConfig) -> str | None:

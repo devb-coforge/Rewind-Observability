@@ -6,6 +6,7 @@ from obs.analytics.pricing import Pricing
 from obs.config import AppConfig, SourceConfig
 from obs.db.repo import Store
 from obs.ingest.pipeline import Ingestor
+from obs.ingest.scanner import source_root
 
 ROOT = Path(__file__).parent
 
@@ -22,6 +23,34 @@ def test_classify_fixture_dirs_by_name(source_dirs):
     claude, codex = source_dirs
     assert infer_agent_from_path(claude) == "claude_code"
     assert infer_agent_from_path(codex) == "codex"
+
+
+def test_source_roots_expand_environment_variables(source_dirs, monkeypatch):
+    _, codex = source_dirs
+    monkeypatch.setenv("OBS_TEST_SOURCE_PARENT", str(codex.parent))
+    source = SourceConfig(path="$OBS_TEST_SOURCE_PARENT/codex")
+    assert source_root(source) == codex
+
+
+def test_names_import_from_environment_variable_source_root(source_dirs, tmp_path, monkeypatch):
+    import json
+
+    _, codex = source_dirs
+    monkeypatch.setenv("OBS_TEST_SOURCE_PARENT", str(codex.parent))
+    (codex / "session_index.jsonl").write_text(json.dumps({
+        "id": "codex-sess-1", "thread_name": "Saved Codex name",
+    }) + "\n")
+    config = AppConfig(
+        sources=[SourceConfig(path="$OBS_TEST_SOURCE_PARENT/codex")],
+        data_dir=tmp_path / "data",
+        ingest_on_startup=False,
+    )
+    store = Store(config.data_dir)
+    try:
+        Ingestor(config, store, Pricing.load(ROOT / "pricing.yaml")).run()
+        assert store.get_session("codex:codex-sess-1")["title"] == "Saved Codex name"
+    finally:
+        store.close()
 
 
 def test_ingest_removes_files_outside_configured_roots(source_dirs, tmp_path: Path):

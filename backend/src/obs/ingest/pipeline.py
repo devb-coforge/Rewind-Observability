@@ -50,6 +50,22 @@ class Ingestor:
                         stats["files_parsed"] += 1
                         stats["events"] += added
                 self._prune(root, discovered, affected)
+                if adapter.name == "codex":
+                    titles = adapter.session_titles(root)
+                    if titles is not None:
+                        sessions = list(self.store.index.execute(
+                            "SELECT id, native_id, source_path, source_title FROM sessions WHERE agent = 'codex'"
+                        ))
+                        for session in sessions:
+                            if not path_under_source(session["source_path"], source):
+                                continue
+                            title = titles.get(session["native_id"])
+                            if title != session["source_title"]:
+                                self.store.index.execute(
+                                    "UPDATE sessions SET source_title = ? WHERE id = ?",
+                                    (title, session["id"]),
+                                )
+                                affected.add(session["id"])
             stats["files_removed"] += self._prune_outside_sources(affected)
             dismissals = {
                 row["project_id"]: self.store.dismissal_prefixes(row["project_id"])

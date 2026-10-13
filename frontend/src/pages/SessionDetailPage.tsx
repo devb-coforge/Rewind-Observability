@@ -78,10 +78,6 @@ export function SessionDetailPage() {
               {detail.git_branch ? ` · ${detail.git_branch}` : ""}
             </p>
           </div>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            <input type="checkbox" checked={showThinking} onChange={(event) => setShowThinking(event.target.checked)} />
-            Show thinking
-          </label>
         </header>
         {detail.project_hidden ? (
           <p className="border-b border-line bg-surface px-4 py-2 text-sm text-muted">
@@ -100,7 +96,7 @@ export function SessionDetailPage() {
         <div className="min-h-0 flex-1">
           {events.isLoading ? <p className="p-4 text-sm text-muted">Loading events…</p> : null}
           {events.data ? (
-            <Timeline events={events.data} showThinking={showThinking} focusId={focusId} onRaw={(id) => void loadRaw(id)} />
+            <Timeline key={sessionId} events={events.data} showThinking={showThinking} onShowThinkingChange={setShowThinking} focusId={focusId} onRaw={(id) => void loadRaw(id)} />
           ) : null}
         </div>
       </section>
