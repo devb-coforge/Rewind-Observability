@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import gzip
 import hashlib
 import json
 import logging
@@ -9,7 +10,7 @@ from pathlib import Path
 import re
 import threading
 import time
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import yaml
 
@@ -84,8 +85,12 @@ class Pricing:
                 return
             self.last_attempt = now
             try:
-                with urlopen("https://openrouter.ai/api/v1/models", timeout=10) as response:
-                    catalog = json.load(response)
+                request = Request("https://openrouter.ai/api/v1/models", headers={"Accept-Encoding": "gzip"})
+                with urlopen(request, timeout=30) as response:
+                    body = response.read()
+                    if response.headers.get("Content-Encoding", "").lower() == "gzip":
+                        body = gzip.decompress(body)
+                    catalog = json.loads(body)
                 models = self._catalog(catalog)
                 self.cache_path.parent.mkdir(parents=True, exist_ok=True)
                 temporary = self.cache_path.with_suffix(".tmp")

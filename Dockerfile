@@ -15,7 +15,6 @@ COPY --from=web /src/frontend/dist /app/frontend/dist
 WORKDIR /app/backend
 RUN uv sync --frozen --no-dev
 ENV OBS_DATA_DIR=/data \
-    OBS_PRICING_FILE=/app/pricing.yaml \
     OBS_STATIC_DIR=/app/frontend/dist \
     OBS_HOST=0.0.0.0 \
     PYTHONUNBUFFERED=1

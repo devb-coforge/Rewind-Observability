@@ -19,7 +19,7 @@ Compose mounts:
 - `~/.cursor` at `/sources/cursor` (read-only)
 - a named volume `obs-data` at `/data`
 
-The process drops to `PUID` and `PGID` before reading transcripts or writing the database. The command above uses your host user's IDs so private transcript folders remain readable. Compose defaults to `502` and `20` when these variables are omitted; those defaults often differ from Linux account IDs.
+The process drops to `PUID` and `PGID` before reading transcripts or writing the database. Compose defaults to `1000` for both IDs, so hosts with UID and GID `1000` can use `docker compose up -d --build` directly. The command above supplies your host user's IDs for accounts with different IDs.
 
 If a rescan reports `Permission denied` for `/sources/claude` or `/sources/codex`, recreate the container with your host IDs:
 

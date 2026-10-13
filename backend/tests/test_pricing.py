@@ -1,7 +1,9 @@
 from obs.analytics.pricing import Price, Pricing
 from obs.models import Usage
 import io
+import gzip
 import json
+import pytest
 from urllib.error import URLError
 
 
@@ -27,7 +29,9 @@ def test_openrouter_cache_refresh_offline_and_retry(tmp_path, monkeypatch):
 
     def fetch(url, timeout):
         calls.append(url)
-        return io.StringIO(json.dumps(catalog()))
+        response = io.BytesIO(json.dumps(catalog()).encode())
+        response.headers = {}
+        return response
 
     monkeypatch.setattr("obs.analytics.pricing.urlopen", fetch)
     pricing = Pricing.openrouter(tmp_path)
@@ -52,6 +56,25 @@ def test_openrouter_cache_refresh_offline_and_retry(tmp_path, monkeypatch):
     now[0] += 301
     cached.refresh()
     assert len(calls) == 3
+
+
+@pytest.mark.parametrize("compressed", [False, True])
+def test_openrouter_catalog_response_encoding(tmp_path, monkeypatch, compressed):
+    body = json.dumps(catalog()).encode()
+
+    def fetch(request, timeout):
+        assert request.full_url == "https://openrouter.ai/api/v1/models"
+        assert request.get_header("Accept-encoding") == "gzip"
+        assert timeout == 30
+        response = io.BytesIO(gzip.compress(body) if compressed else body)
+        response.headers = {"Content-Encoding": "gzip"} if compressed else {}
+        return response
+
+    monkeypatch.setattr("obs.analytics.pricing.urlopen", fetch)
+    pricing = Pricing.openrouter(tmp_path)
+    pricing.refresh()
+    assert pricing.match("gpt-6.1-sol").input == 2
+    assert json.loads(pricing.cache_path.read_text())["catalog"] == catalog()
 
 
 def test_openrouter_model_mapping_rates_and_tiers(tmp_path):
