@@ -53,19 +53,22 @@ def freeze_case(
             }
         )
     tokens, cost, model = _usage_for(events, pricing, cached_input_included=session["agent"] == "codex")
+    if model is None:
+        model = _single_recorded_model(session)
     now = _now()
     case_id = str(uuid.uuid4())
     store.user.execute(
         """
         INSERT INTO eval_cases(
-          id, session_id, project_id, project_cwd, project_name, agent, model, prompt,
+          id, session_id, session_title, project_id, project_cwd, project_name, agent, model, prompt,
           final_message, tool_summary_json, tokens_in, tokens_out, tokens_cache_read,
           tokens_cache_write, est_cost_usd, from_seq, to_seq, verdict, note, created_at, updated_at
-        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unset', NULL, ?, ?)
+        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unset', NULL, ?, ?)
         """,
         (
             case_id,
             session_id,
+            session["title"],
             session["project_id"],
             session["project_cwd"],
             session["project_name"],
@@ -86,6 +89,31 @@ def freeze_case(
         ),
     )
     return case_dict(store.user.execute("SELECT * FROM eval_cases WHERE id = ?", (case_id,)).fetchone())
+
+
+def _single_recorded_model(session) -> str | None:
+    # A session with one recorded model can supply missing slice attribution.
+    # Never infer a historical model from the current selection or pick among
+    # multiple models when there is no event-to-message mapping.
+    models = json.loads(session["models_json"] or "[]")
+    return models[0] if len(models) == 1 else None
+
+
+def backfill_case_metadata(store: Store) -> None:
+    """Fill missing snapshot metadata while preserving existing case values."""
+    for case in store.user.execute(
+        "SELECT id, session_id, session_title, model FROM eval_cases WHERE session_title IS NULL OR model IS NULL"
+    ).fetchall():
+        session = store.get_session(case["session_id"])
+        if session is None:
+            continue
+        title = case["session_title"] or session["title"]
+        model = case["model"] or _single_recorded_model(session)
+        if title != case["session_title"] or model != case["model"]:
+            store.user.execute(
+                "UPDATE eval_cases SET session_title = ?, model = ? WHERE id = ?",
+                (title, model, case["id"]),
+            )
 
 
 def list_cases(store: Store, *, project: str | None, model: str | None, verdict: str | None) -> list[dict]:
@@ -191,6 +219,7 @@ def case_dict(row, *, preview: bool = False) -> dict:
     return {
         "id": row["id"],
         "session_id": row["session_id"],
+        "session_title": row["session_title"],
         "project_id": row["project_id"],
         "project_cwd": row["project_cwd"],
         "project_name": row["project_name"],

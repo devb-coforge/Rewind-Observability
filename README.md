@@ -121,6 +121,8 @@ The check compares paths found in tool calls with the session's recorded project
 
 Freeze a whole session, or a sequence range, from the session page. The case copies the prompt, model, token and cost estimates, a tool and path summary, and the final assistant message. Pass and fail are labels you set. The summary compares models on the cases you froze, which is a biased sample of your work. The app does not call a model provider.
 
+Eval cards show the saved session title without prompt previews or tool-path badges. The prompt and final message are available under Show detail. If event models are absent and the session has exactly one recorded model, that model is copied into the case; the current model selection is not used. Multiple recorded models without event attribution leave the case model unknown. Rescan fills missing titles and unambiguous models on existing cases while preserving their prompts, verdicts, notes, and previously saved metadata.
+
 ## Local development
 
 Backend (Python 3.12+, [uv](https://docs.astral.sh/uv/)):

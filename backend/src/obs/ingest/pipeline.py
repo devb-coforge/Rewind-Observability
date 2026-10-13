@@ -127,6 +127,9 @@ class Ingestor:
                 )
             self.store.drop_empty_sessions()
             self.store.refresh_project_names()
+            from obs.evals import backfill_case_metadata
+
+            backfill_case_metadata(self.store)
             self.store.set_meta("pricing_fingerprint", pricing_fingerprint)
             from datetime import datetime, timezone
 

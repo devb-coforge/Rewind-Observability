@@ -173,6 +173,7 @@ export type ToolSummary = {
 };
 
 export type EvalCase = {
+  session_title?: string | null;
   id: string;
   session_id: string;
   project_id: string | null;

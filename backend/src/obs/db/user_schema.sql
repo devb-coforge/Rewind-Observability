@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS boundary_dismissals (
 CREATE TABLE IF NOT EXISTS eval_cases (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
+  session_title TEXT,
   project_id TEXT,
   project_cwd TEXT,
   project_name TEXT,

@@ -4,9 +4,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { EvalCase } from "../api/types";
-import { AgentBadge, Badge, Button, Card, EmptyState, Input, Page, PageHeader, SectionTitle, Select, td, th, Toolbar } from "../components/ui";
+import { Button, Card, EmptyState, Input, Page, PageHeader, SectionTitle, Select, td, th, Toolbar } from "../components/ui";
 import { cn } from "../lib/cn";
-import { formatCompact, formatCost, formatPercent, formatTokens } from "../lib/format";
+import { formatCompact, formatCost, formatPercent } from "../lib/format";
 
 export function EvalsPage() {
   const queryClient = useQueryClient();
@@ -134,20 +134,8 @@ function CaseCard({ item, onChange }: { item: EvalCase; onChange: () => Promise<
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <Link className="line-clamp-2 text-[13px] font-medium text-ink hover:text-accent" to={`/sessions/${encodeURIComponent(item.session_id)}`}>
-            {item.prompt || item.session_id}
+            {item.session_title || "Untitled session"}
           </Link>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-2xs text-subtle">
-            <AgentBadge agent={item.agent} />
-            <span className="font-mono">{item.model || "unknown model"}</span>
-            <span aria-hidden="true">·</span>
-            <span>{item.project_name || "(unknown)"}</span>
-            <span aria-hidden="true">·</span>
-            <span className="tabular-nums">{formatCost(item.est_cost_usd)}</span>
-            <span aria-hidden="true">·</span>
-            <span className="tabular-nums">
-              {formatTokens(item.tokens_in)} / {formatTokens(item.tokens_out)} tokens
-            </span>
-          </div>
         </div>
         <div role="group" aria-label="Verdict" className="inline-flex rounded-md border border-line bg-bg p-0.5">
           {(["pass", "fail", "unset"] as const).map((verdict) => {
@@ -171,22 +159,6 @@ function CaseCard({ item, onChange }: { item: EvalCase; onChange: () => Promise<
           })}
         </div>
       </div>
-      {item.tool_summary.length ? (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {item.tool_summary.map((tool, index) => (
-            <Badge
-              key={`${tool.tool_name}-${index}`}
-              tone={tool.is_error ? "danger" : "neutral"}
-              className="max-w-full font-mono"
-            >
-              <span className="truncate" title={tool.paths.join(", ") || undefined}>
-                {tool.tool_name || "tool"}
-                {tool.paths.length ? ` · ${tool.paths.join(", ")}` : ""}
-              </span>
-            </Badge>
-          ))}
-        </div>
-      ) : null}
       {open && detail.data ? (
         <div className="mt-3 space-y-3 rounded-md border border-line bg-bg/60 p-3 text-[13px]">
           <div>

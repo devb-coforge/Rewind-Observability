@@ -48,6 +48,9 @@ class Store:
         }
         if "benchmark_cases" in user_tables and "eval_cases" not in user_tables:
             self.user.execute("ALTER TABLE benchmark_cases RENAME TO eval_cases")
+        case_columns = {row["name"] for row in self.user.execute("PRAGMA table_info(eval_cases)")}
+        if "session_title" not in case_columns:
+            self.user.execute("ALTER TABLE eval_cases ADD COLUMN session_title TEXT")
         self.index.commit()
         self.user.commit()
         self._lock = threading.RLock()
