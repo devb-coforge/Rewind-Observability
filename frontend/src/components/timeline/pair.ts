@@ -39,10 +39,10 @@ export function pairEvents(events: ObsEvent[]): TimelineItem[] {
       );
       if (callExists) continue;
     }
-    if (event.kind === "tool_call" && event.tool_call_id) {
-      if (consumed.has(event.tool_call_id)) continue;
-      consumed.add(event.tool_call_id);
-      items.push({ type: "tool", call: event, result: results.get(event.tool_call_id) });
+    if (event.kind === "tool_call") {
+      if (event.tool_call_id && consumed.has(event.tool_call_id)) continue;
+      if (event.tool_call_id) consumed.add(event.tool_call_id);
+      items.push({ type: "tool", call: event, result: event.tool_call_id ? results.get(event.tool_call_id) : undefined });
       continue;
     }
     items.push({ type: "single", event });

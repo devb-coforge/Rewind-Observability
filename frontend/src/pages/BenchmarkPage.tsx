@@ -25,7 +25,6 @@ export function BenchmarkPage() {
 
   return (
     <div className="h-full overflow-auto px-4 py-4 md:px-6">
-      <p className="mb-4 max-w-3xl text-sm text-muted">{summary.data?.note}</p>
       <div className="mb-4 flex flex-wrap gap-2">
         <select className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm" aria-label="Project" value={project} onChange={(event) => setProject(event.target.value)}>
           <option value="">All projects</option>

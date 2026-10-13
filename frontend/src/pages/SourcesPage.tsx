@@ -21,7 +21,7 @@ export function SourcesPage() {
           className="rounded-md border border-line px-3 py-1.5 text-sm"
           disabled={scan.isPending}
           onClick={() => {
-            if (window.confirm("Rebuild the index? Notes, hidden projects, path allows, and benchmark cases stay.")) {
+            if (window.confirm("Rebuild the index?")) {
               scan.mutate(true);
             }
           }}
@@ -63,13 +63,11 @@ export function SourcesPage() {
         <h2 className="font-medium">OpenTelemetry</h2>
         {sources.data?.otel.enabled ? (
           <p className="text-muted">
-            Exporting {sources.data.otel.protocol} to {sources.data.otel.endpoint}.
-            {sources.data.otel.include_content
-              ? " Content export is on, so prompt and tool text can leave this machine."
-              : " Content stays local. Spans carry structure and usage only."}
+            Enabled · {sources.data.otel.protocol} · {sources.data.otel.endpoint}
+            {sources.data.otel.include_content ? " · Content on" : " · Content off"}
           </p>
         ) : (
-          <p className="text-muted">Export is off because no collector endpoint is set.</p>
+          <p className="text-muted">Disabled</p>
         )}
         {sources.data?.otel.last_error ? <p className="text-danger">Last export error: {sources.data.otel.last_error}</p> : null}
       </section>

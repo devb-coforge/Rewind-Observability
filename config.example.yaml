@@ -2,6 +2,10 @@
 sources:
   - path: /sources/claude
   - path: /sources/codex
+  - path: /sources/cursor
+
+# Optional Cursor sidebar names (mount Cursor's User folder read-only here).
+# cursor_user_data_dir: /sources/cursor/user-data
 
 data_dir: /data
 pricing_file: /app/pricing.yaml

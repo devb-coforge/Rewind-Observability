@@ -16,6 +16,8 @@ def test_infer_agent_from_well_known_dir_names(tmp_path: Path):
     assert infer_agent_from_path(tmp_path / "claude") == "claude_code"
     assert infer_agent_from_path(tmp_path / ".codex") == "codex"
     assert infer_agent_from_path(tmp_path / "codex") == "codex"
+    assert infer_agent_from_path(tmp_path / ".cursor") == "cursor"
+    assert infer_agent_from_path(tmp_path / "cursor") == "cursor"
     assert infer_agent_from_path(tmp_path / "extra") is None
 
 

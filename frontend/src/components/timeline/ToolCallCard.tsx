@@ -25,7 +25,7 @@ export function ToolCallCard({ call, result, expanded, onExpandedChange, onRaw }
   const patch = stringField(input, "patch");
   const oldString = stringField(input, "old_string");
   const newString = stringField(input, "new_string");
-  const content = stringField(input, "content");
+  const content = stringField(input, "content") || stringField(input, "contents");
   const edits = Array.isArray(input?.edits) ? input.edits : [];
   const failed = call.is_error || Boolean(result?.is_error);
   const outside = [...(call.paths || []), ...(result?.paths || [])].some((item) => item.outside && !item.allowed);
@@ -68,7 +68,7 @@ export function ToolCallCard({ call, result, expanded, onExpandedChange, onRaw }
           <button type="button" className="ml-auto hover:text-ink" onClick={() => onRaw(call.id)}>View raw call</button>
           {result ? <button type="button" className="hover:text-ink" onClick={() => onRaw(result.id)}>View raw result</button> : null}
         </div> : null}
-        {SHELL.has(name) && command ? (
+        {SHELL.has(name.toLowerCase()) && command ? (
           <pre className="overflow-auto rounded-md bg-[#10120c] p-3 font-mono text-xs text-ink">{command}</pre>
         ) : null}
         {oldString != null || newString != null ? <DiffView before={oldString || ""} after={newString || ""} /> : null}

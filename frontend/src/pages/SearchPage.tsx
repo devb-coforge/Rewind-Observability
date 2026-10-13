@@ -39,6 +39,7 @@ export function SearchPage() {
           <option value="">All agents</option>
           <option value="claude_code">Claude Code</option>
           <option value="codex">Codex</option>
+          <option value="cursor">Cursor</option>
         </select>
         <button type="submit" className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-[#1a1608]" disabled={pending}>
           {pending ? "Searching…" : "Search"}

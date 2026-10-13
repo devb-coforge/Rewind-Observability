@@ -61,6 +61,7 @@ def summary(store: Store, filters: dict) -> dict:
         f"""
         SELECT
           COUNT(*) AS sessions,
+          SUM(CASE WHEN started_at IS NULL THEN 1 ELSE 0 END) AS missing_start,
           SUM(tokens_in) AS tokens_in,
           SUM(tokens_out) AS tokens_out,
           SUM(tokens_cache_read) AS tokens_cache_read,
@@ -102,6 +103,7 @@ def summary(store: Store, filters: dict) -> dict:
         cost_coverage = "complete"
     return {
         "sessions": sessions,
+        "sessions_missing_start": row["missing_start"] or 0,
         "tokens_in": row["tokens_in"],
         "tokens_out": row["tokens_out"],
         "tokens_cache_read": row["tokens_cache_read"],
@@ -133,7 +135,7 @@ def timeseries(store: Store, filters: dict, *, metric: str, bucket: str, group_b
         join = ""
     value_expr = {
         "sessions": "COUNT(*)",
-        "tokens": "SUM(COALESCE(s.tokens_in, 0) + COALESCE(s.tokens_out, 0))",
+        "tokens": "SUM(CASE WHEN s.tokens_in IS NULL AND s.tokens_out IS NULL THEN NULL ELSE COALESCE(s.tokens_in, 0) + COALESCE(s.tokens_out, 0) END)",
         "cost": "SUM(s.est_cost_usd)",
         "duration": "AVG((julianday(s.ended_at) - julianday(s.started_at)) * 86400.0)",
     }.get(metric, "COUNT(*)")
