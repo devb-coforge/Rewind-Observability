@@ -30,6 +30,8 @@ class Ingestor:
         self.pricing = pricing
 
     def run(self, *, full: bool = False) -> dict:
+        self.pricing.refresh()
+        pricing_fingerprint = self.pricing.fingerprint()
         stats = {
             "files_seen": 0,
             "files_parsed": 0,
@@ -39,6 +41,8 @@ class Ingestor:
         }
         affected: set[str] = set()
         with self.store.transaction():
+            if self.store.get_meta("pricing_fingerprint") != pricing_fingerprint:
+                affected.update(row["id"] for row in self.store.index.execute("SELECT id FROM sessions"))
             if full:
                 self.store.reset_index()
             for source, adapter in resolve_sources(self.config.sources):
@@ -112,6 +116,7 @@ class Ingestor:
                 )
             self.store.drop_empty_sessions()
             self.store.refresh_project_names()
+            self.store.set_meta("pricing_fingerprint", pricing_fingerprint)
             from datetime import datetime, timezone
 
             self.store.set_meta(

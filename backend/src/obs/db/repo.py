@@ -382,7 +382,7 @@ class Store:
                     continue
                 totals[field] = (totals[field] or 0) + value
             model = row["model"] or last_model
-            estimate = pricing.estimate(model, usage)
+            estimate = pricing.estimate(model, usage, cached_input_included=session["agent"] == "codex")
             if estimate is None:
                 missing_price = True
             else:

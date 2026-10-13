@@ -52,7 +52,7 @@ def freeze_case(
                 "is_error": bool(result["is_error"]) if result is not None else bool(call["is_error"]),
             }
         )
-    tokens, cost, model = _usage_for(events, pricing)
+    tokens, cost, model = _usage_for(events, pricing, cached_input_included=session["agent"] == "codex")
     now = _now()
     case_id = str(uuid.uuid4())
     store.user.execute(
@@ -213,7 +213,7 @@ def case_dict(row, *, preview: bool = False) -> dict:
     }
 
 
-def _usage_for(events, pricing: Pricing) -> tuple[dict, float | None, str | None]:
+def _usage_for(events, pricing: Pricing, *, cached_input_included: bool = False) -> tuple[dict, float | None, str | None]:
     has_token_count = any(event["usage_origin"] == "token_count" and event["usage_json"] for event in events)
     seen: set[str] = set()
     totals = {
@@ -244,7 +244,7 @@ def _usage_for(events, pricing: Pricing) -> tuple[dict, float | None, str | None
             value = getattr(usage, field)
             if value is not None:
                 totals[field] = (totals[field] or 0) + value
-        estimate = pricing.estimate(event["model"] or last_model, usage)
+        estimate = pricing.estimate(event["model"] or last_model, usage, cached_input_included=cached_input_included)
         if estimate is not None:
             any_cost = True
             cost += estimate
