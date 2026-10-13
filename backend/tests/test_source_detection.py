@@ -1,12 +1,12 @@
-import shutil
 from pathlib import Path
+import shutil
 
-from obs.adapters.detect import infer_agent_from_path
 from obs.analytics.pricing import Pricing
 from obs.config import AppConfig, SourceConfig
 from obs.db.repo import Store
 from obs.ingest.pipeline import Ingestor
 from obs.ingest.scanner import source_root
+from obs.shared.detect import infer_agent_from_path
 
 ROOT = Path(__file__).parent
 

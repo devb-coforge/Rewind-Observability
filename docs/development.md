@@ -31,3 +31,15 @@ cd frontend && npm test
 ```
 
 Backend coverage needs the `dev` extra (`uv sync --extra dev`). The second command prints per-file line coverage and a total percentage for the `obs` package.
+
+## Backend organization
+
+The backend lives in `backend/src/obs`:
+
+- `api/endpoints/` groups routes by feature. `api/routes.py` assembles them under `/api`; request models live in `api/schemas.py`.
+- `adapters/` contains transcript adapters, their registry, and the `Adapter` protocol in `interface.py`. Every adapter implements discovery, parsing, and `read_metadata()`.
+- `ingest/` coordinates indexing and metadata refresh through that common adapter interface.
+- `db/` groups persistence operations by responsibility: files, events, sessions, projects, preferences, and boundaries. `Store` in `db/repo.py` owns the connections, schema setup, and transaction scope, and delegates to those modules. Repository functions reuse its connections; callers wrap writes in `store.transaction()`.
+- `db/serialization.py` converts parsed events into database rows and stored rows into response dictionaries.
+- `analytics/` contains queries, pricing, usage decoding, duration calculations, and session summary recomputation.
+- `shared/` contains reusable file discovery, source detection, JSONL, and transcript parsing helpers.

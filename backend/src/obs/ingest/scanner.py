@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
+import os
 
 from obs.adapters import adapter_by_name
-from obs.adapters.detect import infer_agent_from_path
+from obs.adapters.interface import Adapter
 from obs.config import SourceConfig
+from obs.shared.detect import infer_agent_from_path
 
 
 def source_root(source: SourceConfig) -> Path:
@@ -16,8 +17,8 @@ def resolve_agent(source: SourceConfig) -> str | None:
     return infer_agent_from_path(source_root(source))
 
 
-def resolve_sources(sources: list[SourceConfig]) -> list[tuple[SourceConfig, object | None]]:
-    resolved: list[tuple[SourceConfig, object | None]] = []
+def resolve_sources(sources: list[SourceConfig]) -> list[tuple[SourceConfig, Adapter | None]]:
+    resolved: list[tuple[SourceConfig, Adapter | None]] = []
     for source in sources:
         kind = resolve_agent(source)
         try:

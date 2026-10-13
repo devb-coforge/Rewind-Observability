@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import uuid
-from datetime import datetime, timezone
 
 from obs.analytics.pricing import Pricing
 from obs.analytics.stats import median_or_none
-from obs.db.repo import Store, _load_usage
+from obs.analytics.usage import load_usage
+from obs.db.repo import Store
 
 
 def freeze_case(
@@ -280,7 +281,7 @@ def _usage_for(events, pricing: Pricing, *, cached_input_included: bool = False)
         if event["model"]:
             last_model = event["model"]
             model = event["model"]
-        usage = _load_usage(event["usage_json"])
+        usage = load_usage(event["usage_json"])
         origin = event["usage_origin"]
         if not usage:
             continue

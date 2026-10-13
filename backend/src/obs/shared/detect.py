@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 from obs.models import AgentName
 
 _CLAUDE_DIR_NAMES = frozenset({".claude", "claude"})

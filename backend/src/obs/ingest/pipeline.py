@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import logging
-import json
 from pathlib import Path
+import json
+import logging
 
-from obs.adapters.lineio import to_iso
+from obs.adapters.interface import Adapter
 from obs.analytics.pricing import Pricing
 from obs.config import AppConfig
-from obs.db.repo import Store, build_event_row, project_fields
+from obs.db.repo import Store
+from obs.db.serialization import build_event_row, project_fields
 from obs.identity import event_id_for, session_id_for
 from obs.ingest.scanner import path_under_source, resolve_sources, source_root
+from obs.shared.lineio import to_iso
 
 log = logging.getLogger("obs.ingest")
 
@@ -73,67 +75,65 @@ class Ingestor:
                         stats["files_parsed"] += 1
                         stats["events"] += added
                 self._prune(root, discovered, affected)
-                if hasattr(adapter, "session_titles"):
-                    metadata = adapter.session_metadata(root, self.config.cursor_user_data_dir) if adapter.name == "cursor" else None
-                    titles = (
-                        None if metadata is None else {sid: entry.get("title") for sid, entry in metadata.items()}
-                    ) if adapter.name == "cursor" else adapter.session_titles(root)
-                    if titles is not None:
-                        sessions = list(self.store.index.execute(
-                            "SELECT * FROM sessions WHERE agent = ?",
-                            (adapter.name,),
-                        ))
-                        for session in sessions:
-                            if not path_under_source(session["source_path"], source):
-                                continue
-                            if metadata is not None:
-                                from obs.ingest.cursor_tools import sync_tools
+                snapshot = adapter.read_metadata(root, self.config.cursor_user_data_dir)
+                if snapshot is not None:
+                    metadata = snapshot.entries
+                    titles = snapshot.titles
+                    sessions = list(self.store.index.execute(
+                        "SELECT * FROM sessions WHERE agent = ?",
+                        (adapter.name,),
+                    ))
+                    for session in sessions:
+                        if not path_under_source(session["source_path"], source):
+                            continue
+                        if metadata is not None:
+                            from obs.ingest.cursor_tools import sync_tools
 
-                                if sync_tools(self.store, session, metadata.get(session["native_id"], {}).get("tools", [])):
-                                    affected.add(session["id"])
-                            title = titles.get(session["native_id"])
-                            created_at = (metadata or {}).get(session["native_id"], {}).get("started_at")
-                            if metadata is not None:
-                                entry = metadata.get(session["native_id"], {})
-                                duration = entry.get("duration_sec")
-                                if duration != session["source_duration_sec"]:
-                                    self.store.index.execute(
-                                        "UPDATE sessions SET source_duration_sec = ? WHERE id = ?",
-                                        (duration, session["id"]),
-                                    )
-                                    affected.add(session["id"])
-                                cwd = entry.get("project_cwd")
-                                cwd_key = f"cursor_workspace:{session['id']}"
-                                previous_cwd = self.store.get_meta(cwd_key)
-                                if cwd and (not session["project_cwd"] or session["project_cwd"] == previous_cwd):
-                                    identity = project_fields(adapter.name, cwd)
-                                    if identity["project_cwd"] != session["project_cwd"]:
-                                        self.store.index.execute(
-                                            "UPDATE sessions SET project_cwd = ?, project_id = ?, project_name = ? WHERE id = ?",
-                                            (identity["project_cwd"], identity["project_id"], identity["project_name"], session["id"]),
-                                        )
-                                        affected.add(session["id"])
-                                    self.store.set_meta(cwd_key, identity["project_cwd"])
-                                models_json = json.dumps(entry.get("models", []))
-                                selected_model = entry.get("selected_model")
-                                if models_json != session["source_models_json"] or selected_model != session["selected_model"]:
-                                    self.store.index.execute(
-                                        "UPDATE sessions SET source_models_json = ?, selected_model = ? WHERE id = ?",
-                                        (models_json, selected_model, session["id"]),
-                                    )
-                                    affected.add(session["id"])
-                            if session["started_at"] is None and created_at:
+                            if sync_tools(self.store, session, metadata.get(session["native_id"], {}).get("tools", [])):
+                                affected.add(session["id"])
+                        title = titles.get(session["native_id"])
+                        created_at = (metadata or {}).get(session["native_id"], {}).get("started_at")
+                        if metadata is not None:
+                            entry = metadata.get(session["native_id"], {})
+                            duration = entry.get("duration_sec")
+                            if duration != session["source_duration_sec"]:
                                 self.store.index.execute(
-                                    "UPDATE sessions SET started_at = ? WHERE id = ?",
-                                    (created_at, session["id"]),
+                                    "UPDATE sessions SET source_duration_sec = ? WHERE id = ?",
+                                    (duration, session["id"]),
                                 )
                                 affected.add(session["id"])
-                            if title != session["source_title"]:
+                            cwd = entry.get("project_cwd")
+                            cwd_key = f"{adapter.name}_workspace:{session['id']}"
+                            previous_cwd = self.store.get_meta(cwd_key)
+                            if cwd and (not session["project_cwd"] or session["project_cwd"] == previous_cwd):
+                                identity = project_fields(adapter.name, cwd)
+                                if identity["project_cwd"] != session["project_cwd"]:
+                                    self.store.index.execute(
+                                        "UPDATE sessions SET project_cwd = ?, project_id = ?, project_name = ? WHERE id = ?",
+                                        (identity["project_cwd"], identity["project_id"], identity["project_name"], session["id"]),
+                                    )
+                                    affected.add(session["id"])
+                                self.store.set_meta(cwd_key, identity["project_cwd"])
+                            models_json = json.dumps(entry.get("models", []))
+                            selected_model = entry.get("selected_model")
+                            if models_json != session["source_models_json"] or selected_model != session["selected_model"]:
                                 self.store.index.execute(
-                                    "UPDATE sessions SET source_title = ? WHERE id = ?",
-                                    (title, session["id"]),
+                                    "UPDATE sessions SET source_models_json = ?, selected_model = ? WHERE id = ?",
+                                    (models_json, selected_model, session["id"]),
                                 )
                                 affected.add(session["id"])
+                        if session["started_at"] is None and created_at:
+                            self.store.index.execute(
+                                "UPDATE sessions SET started_at = ? WHERE id = ?",
+                                (created_at, session["id"]),
+                            )
+                            affected.add(session["id"])
+                        if title != session["source_title"]:
+                            self.store.index.execute(
+                                "UPDATE sessions SET source_title = ? WHERE id = ?",
+                                (title, session["id"]),
+                            )
+                            affected.add(session["id"])
             stats["files_removed"] += self._prune_outside_sources(affected)
             dismissals = {
                 row["project_id"]: self.store.dismissal_prefixes(row["project_id"])
@@ -191,7 +191,7 @@ class Ingestor:
                 affected.add(row["session_id"])
             self.store.delete_file(row["path"])
 
-    def _ingest_file(self, path: Path, adapter, affected: set[str]) -> int | None:
+    def _ingest_file(self, path: Path, adapter: Adapter, affected: set[str]) -> int | None:
         stat = path.stat()
         previous = self.store.get_file(str(path))
         if (

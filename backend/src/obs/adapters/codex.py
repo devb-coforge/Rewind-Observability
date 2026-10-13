@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
 import json
 import logging
 import re
-from datetime import datetime
-from pathlib import Path
 
-from obs.adapters.detect import infer_agent_from_path
-from obs.adapters.discovery import discover_files
-from obs.adapters.lineio import complete_lines, int_or_none, loads_obj, parse_ts, stringify
-from obs.models import ParsedEvent, ParseResult, Usage
+from obs.adapters.interface import MetadataSnapshot
+from obs.models import AgentName, ParsedEvent, ParseResult, Usage
+from obs.shared.detect import infer_agent_from_path
+from obs.shared.discovery import discover_files
+from obs.shared.lineio import complete_lines, int_or_none, loads_obj, parse_ts, stringify
 
 _TOOL_WRAP = re.compile(r"^text\(await tools\.([A-Za-z0-9_]+)\(", re.DOTALL)
 _EXIT_CODE = re.compile(r"^(?:Exit code:|Process exited with code)\s*(-?\d+)\s*$", re.MULTILINE)
@@ -17,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 class CodexAdapter:
-    name = "codex"
+    name: AgentName = "codex"
     version = 5
 
     def detect(self, root: Path) -> bool:
@@ -28,6 +29,10 @@ class CodexAdapter:
             return []
         base = root / "sessions" if (root / "sessions").is_dir() else root
         return discover_files(base, "rollout-*.jsonl")
+
+    def read_metadata(self, root: Path, user_data_dir: Path | None = None) -> MetadataSnapshot | None:
+        titles = self.session_titles(root)
+        return None if titles is None else MetadataSnapshot(titles=titles)
 
     def session_titles(self, root: Path) -> dict[str, str] | None:
         """Read Codex's conversation names without opening its internal state database.
