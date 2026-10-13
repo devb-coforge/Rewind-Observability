@@ -22,12 +22,6 @@ npm run dev
 
 The dev server proxies `/api` using `OBS_HOST` and `OBS_PORT` from `frontend/.env`. Open http://127.0.0.1:5173.
 
-Regenerate the OpenAPI types while the API is running:
-
-```bash
-npm run gen:api
-```
-
 ## Tests
 
 ```bash

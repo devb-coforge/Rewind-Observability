@@ -7,7 +7,7 @@ import logging
 from obs.config import AppConfig
 from obs.db.repo import Store
 from obs.identity import path_is_allowed
-from obs.otel_export import ExportError, deliver, export_payload
+from obs.otel_export import deliver, export_payload
 
 log = logging.getLogger("obs.export")
 

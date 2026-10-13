@@ -61,10 +61,6 @@ class CasePatch(BaseModel):
     note: str | None = None
 
 
-class Ok(BaseModel):
-    status: str = "ok"
-
-
 @router.get("/health")
 def health() -> dict:
     return {"status": "ok"}

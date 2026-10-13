@@ -50,13 +50,6 @@ export function pairEvents(events: ObsEvent[]): TimelineItem[] {
   return items;
 }
 
-export function timelineItems(events: ObsEvent[], showThinking: boolean): TimelineItem[] {
-  return pairEvents(events).filter((item) => {
-    if (showThinking || item.type === "tool") return true;
-    return item.event.kind !== "thinking";
-  });
-}
-
 export function itemKey(item: TimelineItem): string {
   return item.type === "tool" ? item.call.id : item.event.id;
 }

@@ -7,8 +7,8 @@ import uuid
 from datetime import datetime, timezone
 
 from obs.analytics.pricing import Pricing
+from obs.analytics.stats import median_or_none
 from obs.db.repo import Store, _load_usage
-from obs.models import Usage
 
 
 def freeze_case(
@@ -222,8 +222,8 @@ def summarize(store: Store, *, project: str | None, project_cwd: str | None = No
                 "n": len(items),
                 "n_verdict": len(verdicts),
                 "pass_rate": (passes / len(verdicts)) if verdicts else None,
-                "median_cost": _median(costs),
-                "median_tokens": _median(token_values),
+                "median_cost": median_or_none(costs),
+                "median_tokens": median_or_none(token_values),
             }
         )
     return {
@@ -299,16 +299,6 @@ def _usage_for(events, pricing: Pricing, *, cached_input_included: bool = False)
             any_cost = True
             cost += estimate
     return totals, cost if any_cost else None, model
-
-
-def _median(values: list[float]) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    mid = len(ordered) // 2
-    if len(ordered) % 2:
-        return float(ordered[mid])
-    return float(ordered[mid - 1] + ordered[mid]) / 2
 
 
 def _now() -> str:

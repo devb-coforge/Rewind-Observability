@@ -9,7 +9,6 @@ data/
 *.db
 frontend/node_modules/
 frontend/dist/
-frontend/src/api/schema.ts
 .DS_Store
 .env
 backend/.env

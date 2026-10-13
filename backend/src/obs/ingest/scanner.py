@@ -35,7 +35,3 @@ def path_under_source(path: str | Path, source: SourceConfig) -> bool:
         return True
     except ValueError:
         return Path(path).expanduser().resolve() == root
-
-
-def configured_source_roots(sources: list[SourceConfig]) -> list[Path]:
-    return [source_root(source).resolve() for source in sources]

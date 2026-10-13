@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from obs.analytics.pricing import Pricing
+from obs.analytics.stats import median_or_none
 from obs.db.repo import Store, _escape_like
 
 _FTS_TERM = re.compile(r"[\w./:+-]{2,}")
@@ -176,7 +176,7 @@ def summary(store: Store, filters: dict) -> dict:
         "cost_coverage": cost_coverage,
         "tool_calls": row["tool_calls"] or 0,
         "tool_errors": row["tool_errors"] or 0,
-        "median_duration_sec": _median(seconds),
+        "median_duration_sec": median_or_none(seconds),
         "sessions_missing_usage": row["missing_usage"] or 0,
     }
 
@@ -273,18 +273,3 @@ def tools(store: Store, filters: dict) -> dict:
 def _week_expr(column: str) -> str:
     trimmed = f"replace(substr({column}, 1, 19), 'T', ' ')"
     return f"strftime('%Y-W%W', {trimmed})"
-
-
-def _median(values: list[float]) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    mid = len(ordered) // 2
-    if len(ordered) % 2:
-        return float(ordered[mid])
-    return float(ordered[mid - 1] + ordered[mid]) / 2
-
-
-def pricing_unused(pricing: Pricing) -> None:
-    """Pricing is applied at ingest; analytics reads stored estimates."""
-    del pricing

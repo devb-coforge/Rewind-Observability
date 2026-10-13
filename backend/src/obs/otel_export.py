@@ -236,7 +236,6 @@ def _encode_protobuf(spans: list[ExportSpan]) -> bytes:
     from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
     from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
     from opentelemetry.proto.resource.v1.resource_pb2 import Resource
-    from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans, ScopeSpans, Span
 
     request = ExportTraceServiceRequest()
     resource_spans = request.resource_spans.add()

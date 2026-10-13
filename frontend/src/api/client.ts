@@ -48,7 +48,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  health: () => request<{ status: string }>("/api/health"),
   sources: () => request<SourcesResponse>("/api/sources"),
   reindex: (full = false) => request<Record<string, unknown>>(`/api/reindex${query({ full })}`, { method: "POST" }),
   projects: (includeHidden = false) =>
@@ -71,7 +70,6 @@ export const api = {
   sessions: (filters: Filters & { project_cwd?: string; q?: string; sort?: string; cursor?: string; limit?: number }) =>
     request<{ sessions: Session[]; next_cursor: string | null }>(`/api/sessions${query(filters)}`),
   session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
-  note: (id: string) => request<Note & { session_id: string }>(`/api/sessions/${encodeURIComponent(id)}/note`),
   putNote: (id: string, text: string) =>
     request<Note & { session_id: string }>(`/api/sessions/${encodeURIComponent(id)}/note`, {
       method: "PUT",

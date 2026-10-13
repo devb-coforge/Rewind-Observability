@@ -72,7 +72,6 @@ class CodexAdapter:
             parts = stem.split("-")
             # rollout-YYYY-MM-DDTHH-MM-SS-<uuid>
             if len(parts) >= 2:
-                tail = stem.split("-", 6)
                 # The uuid uses hyphens, so take everything after the timestamp token.
                 # Filename: rollout-2026-10-12T10-15-15-<uuid>
                 match = re.search(

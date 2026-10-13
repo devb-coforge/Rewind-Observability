@@ -52,23 +52,6 @@ def load_dotenv_file() -> None:
         load_dotenv(path)
 
 
-def default_pricing_file() -> Path | None:
-    env = os.environ.get("OBS_PRICING_FILE")
-    candidates = []
-    if env:
-        candidates.append(Path(env))
-    candidates.extend(
-        [
-            Path("/app/pricing.yaml"),
-            _repo_root() / "pricing.yaml",
-        ]
-    )
-    for path in candidates:
-        if path.is_file():
-            return path
-    return None
-
-
 def default_static_dir() -> Path | None:
     env = os.environ.get("OBS_STATIC_DIR")
     candidates = []
