@@ -106,9 +106,9 @@ export function Badge({ tone = "neutral", className, children }: { tone?: Tone; 
 
 export function AgentBadge({ agent }: { agent: string }) {
   return (
-    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded border border-line-strong bg-surface2 px-1.5 text-2xs font-medium text-muted">
+    <span title={agentLabel(agent)} className="inline-flex h-5 shrink-0 items-center justify-center rounded border border-line-strong bg-surface2 px-1.5 text-2xs font-medium text-muted">
       <AgentIcon agent={agent} className="size-3" />
-      {agentLabel(agent)}
+      <span className="sr-only">{agentLabel(agent)}</span>
     </span>
   );
 }
