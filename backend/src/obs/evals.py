@@ -57,7 +57,7 @@ def freeze_case(
     case_id = str(uuid.uuid4())
     store.user.execute(
         """
-        INSERT INTO benchmark_cases(
+        INSERT INTO eval_cases(
           id, session_id, project_id, project_cwd, project_name, agent, model, prompt,
           final_message, tool_summary_json, tokens_in, tokens_out, tokens_cache_read,
           tokens_cache_write, est_cost_usd, from_seq, to_seq, verdict, note, created_at, updated_at
@@ -85,7 +85,7 @@ def freeze_case(
             now,
         ),
     )
-    return case_dict(store.user.execute("SELECT * FROM benchmark_cases WHERE id = ?", (case_id,)).fetchone())
+    return case_dict(store.user.execute("SELECT * FROM eval_cases WHERE id = ?", (case_id,)).fetchone())
 
 
 def list_cases(store: Store, *, project: str | None, model: str | None, verdict: str | None) -> list[dict]:
@@ -101,14 +101,14 @@ def list_cases(store: Store, *, project: str | None, model: str | None, verdict:
         clauses.append("verdict = ?")
         params.append(verdict)
     rows = store.user.execute(
-        f"SELECT * FROM benchmark_cases WHERE {' AND '.join(clauses)} ORDER BY created_at DESC",
+        f"SELECT * FROM eval_cases WHERE {' AND '.join(clauses)} ORDER BY created_at DESC",
         params,
     )
     return [case_dict(row, preview=True) for row in rows]
 
 
 def get_case(store: Store, case_id: str) -> dict | None:
-    row = store.user.execute("SELECT * FROM benchmark_cases WHERE id = ?", (case_id,)).fetchone()
+    row = store.user.execute("SELECT * FROM eval_cases WHERE id = ?", (case_id,)).fetchone()
     return None if row is None else case_dict(row)
 
 
@@ -120,7 +120,7 @@ def update_case(store: Store, case_id: str, *, verdict: str | None, note: str | 
         raise ValueError("verdict must be unset, pass, or fail")
     store.user.execute(
         """
-        UPDATE benchmark_cases
+        UPDATE eval_cases
         SET verdict = COALESCE(?, verdict),
             note = CASE WHEN ? THEN note ELSE ? END,
             updated_at = ?
@@ -138,7 +138,7 @@ def update_case(store: Store, case_id: str, *, verdict: str | None, note: str | 
 
 
 def delete_case(store: Store, case_id: str) -> bool:
-    cur = store.user.execute("DELETE FROM benchmark_cases WHERE id = ?", (case_id,))
+    cur = store.user.execute("DELETE FROM eval_cases WHERE id = ?", (case_id,))
     return cur.rowcount > 0
 
 
@@ -150,7 +150,7 @@ def summarize(store: Store, *, project: str | None) -> dict:
         params.append(project)
     rows = list(
         store.user.execute(
-            f"SELECT * FROM benchmark_cases WHERE {' AND '.join(clauses)}",
+            f"SELECT * FROM eval_cases WHERE {' AND '.join(clauses)}",
             params,
         )
     )

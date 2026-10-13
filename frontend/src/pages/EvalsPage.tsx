@@ -3,27 +3,27 @@ import { Check, ChevronDown, FlaskConical, Minus, Trash2, X } from "lucide-react
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { BenchmarkCase } from "../api/types";
+import type { EvalCase } from "../api/types";
 import { AgentBadge, Badge, Button, Card, EmptyState, Input, Page, PageHeader, SectionTitle, Select, td, th, Toolbar } from "../components/ui";
 import { cn } from "../lib/cn";
 import { formatCompact, formatCost, formatPercent, formatTokens } from "../lib/format";
 
-export function BenchmarkPage() {
+export function EvalsPage() {
   const queryClient = useQueryClient();
   const [project, setProject] = useState("");
   const [verdict, setVerdict] = useState("");
   const projects = useQuery({ queryKey: ["projects", true], queryFn: () => api.projects(true) });
   const summary = useQuery({
-    queryKey: ["benchmark", "summary", project],
-    queryFn: () => api.benchmarkSummary(project || undefined),
+    queryKey: ["evals", "summary", project],
+    queryFn: () => api.evalsSummary(project || undefined),
   });
   const cases = useQuery({
-    queryKey: ["benchmark", "cases", project, verdict],
+    queryKey: ["evals", "cases", project, verdict],
     queryFn: () => api.cases({ project: project || undefined, verdict: verdict || undefined }),
   });
 
   function refresh() {
-    return queryClient.invalidateQueries({ queryKey: ["benchmark"] });
+    return queryClient.invalidateQueries({ queryKey: ["evals"] });
   }
 
   const groups = summary.data?.groups ?? [];
@@ -31,7 +31,7 @@ export function BenchmarkPage() {
 
   return (
     <Page>
-      <PageHeader title="Benchmark" description="Frozen session slices, labeled pass or fail, compared by model." />
+      <PageHeader title="Evals" description="Frozen session slices, labeled pass or fail, compared by model." />
       <Toolbar>
         <Select className="w-52" aria-label="Project" value={project} onChange={(event) => setProject(event.target.value)}>
           <option value="">All projects</option>
@@ -91,7 +91,7 @@ export function BenchmarkPage() {
         <EmptyState
           icon={<FlaskConical className="size-6" />}
           title="No cases match"
-          description="Open a session and use “Freeze a benchmark case” to capture one."
+          description="Open a session and use “Freeze an eval case” to capture one."
         />
       ) : null}
       <div className="space-y-3">
@@ -109,12 +109,12 @@ const verdictStyle = {
   unset: { icon: Minus, active: "border-line-strong bg-surface3 text-ink" },
 } as const;
 
-function CaseCard({ item, onChange }: { item: BenchmarkCase; onChange: () => Promise<void> }) {
+function CaseCard({ item, onChange }: { item: EvalCase; onChange: () => Promise<void> }) {
   const [note, setNote] = useState(item.note ?? "");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const detail = useQuery({
-    queryKey: ["benchmark", "case", item.id],
+    queryKey: ["evals", "case", item.id],
     queryFn: () => api.case(item.id),
     enabled: open,
   });

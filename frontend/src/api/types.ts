@@ -169,7 +169,7 @@ export type ToolSummary = {
   is_error: boolean;
 };
 
-export type BenchmarkCase = {
+export type EvalCase = {
   id: string;
   session_id: string;
   project_id: string | null;
@@ -193,7 +193,7 @@ export type BenchmarkCase = {
   updated_at: string;
 };
 
-export type BenchmarkGroup = {
+export type EvalGroup = {
   model: string;
   n: number;
   n_verdict: number;

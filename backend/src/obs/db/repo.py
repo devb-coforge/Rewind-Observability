@@ -38,6 +38,11 @@ class Store:
         if "source_title" not in columns:
             self.index.execute("ALTER TABLE sessions ADD COLUMN source_title TEXT")
         self.user.executescript(USER_SCHEMA)
+        user_tables = {
+            row["name"] for row in self.user.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+        if "benchmark_cases" in user_tables and "eval_cases" not in user_tables:
+            self.user.execute("ALTER TABLE benchmark_cases RENAME TO eval_cases")
         self.index.commit()
         self.user.commit()
         self._lock = threading.RLock()

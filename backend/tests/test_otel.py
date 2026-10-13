@@ -29,15 +29,15 @@ def test_span_mapping_stable_ids_and_no_content_by_default(client):
     assert message.status_code == "OK"
 
 
-def test_include_content_is_opt_in_and_benchmark_text_is_absent(client):
-    case = client.post("/api/benchmark/cases", json={"session_id": CLAUDE}).json()
-    client.patch(f"/api/benchmark/cases/{case['id']}", json={"note": "PRIVATE_BENCH_NOTE"})
+def test_include_content_is_opt_in_and_eval_case_text_is_absent(client):
+    case = client.post("/api/evals/cases", json={"session_id": CLAUDE}).json()
+    client.patch(f"/api/evals/cases/{case['id']}", json={"note": "PRIVATE_EVAL_NOTE"})
     detail = client.get(f"/api/sessions/{CLAUDE}").json()
     events = client.get(f"/api/sessions/{CLAUDE}/events", params={"limit": 500}).json()["events"]
     spans = build_spans(detail, events, include_content=True)
     encoded = json.dumps([span.attributes for span in spans])
     assert "Please fix the parser" in encoded
-    assert "PRIVATE_BENCH_NOTE" not in encoded
+    assert "PRIVATE_EVAL_NOTE" not in encoded
 
 
 def test_no_export_without_endpoint(make_client):

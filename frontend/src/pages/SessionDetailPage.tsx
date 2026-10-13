@@ -42,7 +42,7 @@ export function SessionDetailPage() {
       ),
     onSuccess: (created) => {
       setFreezeMessage(`Saved case ${created.id.slice(0, 8)}.`);
-      void queryClient.invalidateQueries({ queryKey: ["benchmark"] });
+      void queryClient.invalidateQueries({ queryKey: ["evals"] });
     },
   });
 
@@ -191,7 +191,7 @@ export function SessionDetailPage() {
           />
         </section>
         <section>
-          <SectionTitle>Freeze a benchmark case</SectionTitle>
+          <SectionTitle>Freeze an eval case</SectionTitle>
           <p className="mb-2.5 text-xs text-subtle">Capture a step range as a reusable case. Leave blank for the whole session.</p>
           <div className="flex gap-2">
             <Input className="w-full" inputMode="numeric" placeholder="From step" aria-label="From seq" value={fromSeq} onChange={(event) => setFromSeq(event.target.value)} />
@@ -204,7 +204,7 @@ export function SessionDetailPage() {
           {freezeMessage ? (
             <p className="mt-2 text-xs text-muted">
               {freezeMessage}{" "}
-              <Link className="font-medium text-accent hover:underline" to="/benchmark">Open benchmark</Link>
+              <Link className="font-medium text-accent hover:underline" to="/evals">Open evals</Link>
             </p>
           ) : null}
         </section>

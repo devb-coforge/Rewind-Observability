@@ -1,6 +1,6 @@
 import type {
-  BenchmarkCase,
-  BenchmarkGroup,
+  EvalCase,
+  EvalGroup,
   BoundaryPath,
   Filters,
   Note,
@@ -103,7 +103,7 @@ export const api = {
       method: "DELETE",
     }),
   freeze: (sessionId: string, fromSeq?: number, toSeq?: number) =>
-    request<BenchmarkCase>("/api/benchmark/cases", {
+    request<EvalCase>("/api/evals/cases", {
       method: "POST",
       body: JSON.stringify({
         session_id: sessionId,
@@ -112,15 +112,15 @@ export const api = {
       }),
     }),
   cases: (filters: { project?: string; model?: string; verdict?: string }) =>
-    request<{ cases: BenchmarkCase[] }>(`/api/benchmark/cases${query(filters)}`),
-  case: (id: string) => request<BenchmarkCase>(`/api/benchmark/cases/${encodeURIComponent(id)}`),
+    request<{ cases: EvalCase[] }>(`/api/evals/cases${query(filters)}`),
+  case: (id: string) => request<EvalCase>(`/api/evals/cases/${encodeURIComponent(id)}`),
   patchCase: (id: string, body: { verdict?: string; note?: string }) =>
-    request<BenchmarkCase>(`/api/benchmark/cases/${encodeURIComponent(id)}`, {
+    request<EvalCase>(`/api/evals/cases/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
   deleteCase: (id: string) =>
-    request<{ deleted: string }>(`/api/benchmark/cases/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  benchmarkSummary: (project?: string) =>
-    request<{ note: string; groups: BenchmarkGroup[] }>(`/api/benchmark/summary${query({ project, group_by: "model" })}`),
+    request<{ deleted: string }>(`/api/evals/cases/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  evalsSummary: (project?: string) =>
+    request<{ note: string; groups: EvalGroup[] }>(`/api/evals/summary${query({ project, group_by: "model" })}`),
 };
