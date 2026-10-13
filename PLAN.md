@@ -1,6 +1,6 @@
 # Agent Session Observability — Initial Plan
 
-A containerized, single-user web app that indexes local coding-agent transcripts (Claude Code, Codex CLI) from mounted folders. This build is a transcript viewer, a usage tracker, an OpenTelemetry export, path-boundary alerts, and a private benchmark kept on this machine.
+A containerized, single-user web app that indexes local coding-agent transcripts (Claude Code, Codex CLI) from mounted folders. This build is a transcript viewer, a usage tracker, an OpenTelemetry export, path-boundary alerts, and a private evals kept on this machine.
 
 **Stack:** Python 3.12 + FastAPI (uv) · SQLite (FTS5) · React + TypeScript (Vite) · Docker / Compose
 
@@ -16,7 +16,7 @@ A containerized, single-user web app that indexes local coding-agent transcripts
 - Usage and cost are best-effort estimates for understanding activity, not billing-grade accounting. Prefer reported usage when available, avoid obvious double-counting, and show unavailable values as unknown.
 - OpenTelemetry export: one trace per session, spans for turns and tool calls, sent OTLP to a configured collector. Structural attributes and usage only, unless content export is explicitly enabled. Export is off when no endpoint is set.
 - Path-boundary alerts: flag tool calls whose path sits outside the session's recorded project directory. Lexical comparison only. No git, and no read of the project working tree.
-- Private benchmark: freeze a session slice into a local case, label it pass or fail, and compare cost and pass rate by model across those cases. The app does not re-run models.
+- Private evals: freeze a session slice into a local case, label it pass or fail, and compare cost and pass rate by model across those cases. The app does not re-run models.
 - Claude Code and Codex CLI are equal priorities: both must work in the initial ingestion and transcript-viewer milestones.
 - Search across sessions
 - Editable session notes, stored locally in the app's writable data volume
@@ -30,7 +30,7 @@ A containerized, single-user web app that indexes local coding-agent transcripts
 - CI (simple pytest + vitest only)
 - An MCP server over the index
 - Joining sessions to git commits, cost-per-commit, or pull-request narratives
-- Re-running a benchmark case against a live model (that would send prompt text off the machine)
+- Re-running an eval case against a live model (that would send prompt text off the machine)
 
 ---
 
@@ -203,7 +203,7 @@ class Adapter(Protocol):
 - `session_notes(session_id PK, text, updated_at)`: one editable plain-text note per session, keyed by stable `<agent>:<native_id>`. Saving empty text clears the note.
 - `project_preferences(project_id PK, hidden, updated_at)`: persistent hide/restore state. Project identity uses the agent and normalized recorded host `cwd`, not the display basename. Sessions without a recorded `cwd` belong to an explicit per-agent unknown-project group.
 - `boundary_dismissals(project_id, path_prefix, updated_at)`: paths you have marked as allowed outside the recorded cwd. Dismissals survive reindex.
-- `benchmark_cases(...)`: frozen session slices and your pass/fail verdict. See section 15. Cases survive reindex because they are copies, not pointers into the transcript.
+- `eval_cases(...)`: frozen session slices and your pass/fail verdict. See section 15. Cases survive reindex because they are copies, not pointers into the transcript.
 - Notes and preferences survive incremental scans, full reindexing, and temporary source removal. Retain them even when their indexed session or project is absent so they reconnect when the same identity returns.
 - These writes affect only the local app data volume. No transcript or host project files are edited or deleted. The README documents backing up the volume, including `user.db`.
 
@@ -251,12 +251,12 @@ GET  /api/boundary?project=&from=&to=             # sessions with outside-cwd pa
 GET  /api/sessions/{id}/boundary                  # paths, event ids, dismissed or not
 PUT  /api/boundary/dismissals                     # {project_id, path_prefix}; local allow
 DELETE /api/boundary/dismissals?project_id=&path_prefix=
-POST /api/benchmark/cases                         # freeze {session_id, from_seq?, to_seq?}
-GET  /api/benchmark/cases?project=&model=&verdict=
-GET  /api/benchmark/cases/{id}
-PATCH /api/benchmark/cases/{id}                   # {verdict, note}
-DELETE /api/benchmark/cases/{id}
-GET  /api/benchmark/summary?group_by=model        # pass rate, cost, tokens
+POST /api/evals/cases                         # freeze {session_id, from_seq?, to_seq?}
+GET  /api/evals/cases?project=&model=&verdict=
+GET  /api/evals/cases/{id}
+PATCH /api/evals/cases/{id}                   # {verdict, note}
+DELETE /api/evals/cases/{id}
+GET  /api/evals/summary?group_by=model        # pass rate, cost, tokens
 ```
 
 Frontend TypeScript types are generated from `/openapi.json` using `openapi-typescript`.
@@ -277,7 +277,7 @@ Project APIs expose an opaque URL-safe `project_id`; the server maps it to the s
 - **Search:** full-text hits that deep-link into the session timeline.
 - **Sources:** what's mounted, what was detected, last index time, and a Rescan button.
 - **Boundary:** a count on the session row, the offending events marked in the timeline, and the path list in the side panel. Dismissing a path prefix allows it for that project.
-- **Benchmark:** from a session, freeze the whole session or a turn range as a case. A cases page shows your verdict, the prompt, the tool and path summary, and pass rate plus estimated cost by model.
+- **Evals:** from a session, freeze the whole session or a turn range as a case. A cases page shows your verdict, the prompt, the tool and path summary, and pass rate plus estimated cost by model.
 - **Libraries:** TanStack Query for data fetching, React Router, and Tailwind + shadcn/ui (swappable).
 
 ---
@@ -312,9 +312,9 @@ volumes:
 - **Backend (pytest):** adapter tests against fixtures, covering block splitting, call/result pairing, usage dedupe, truncated last lines, and unknown lines. Incremental-ingest tests (append → only new events) and API smoke tests using `TestClient` with a temp db.
 - **Local user data (pytest):** note save/read/clear; project hide/restore; consistent hidden-project filtering across lists, search, and analytics; notes/preferences surviving a full index rebuild and source disappearance/reappearance.
 - **Frontend (vitest + Testing Library):** event renderers and pairing logic, note editing/save failure behavior, and hide/restore interactions.
-- **OpenTelemetry (pytest):** span mapping for a message and a paired tool call/result; stable ids across a second export; content attributes absent by default; a boundary violation exports a boolean and not the path; benchmark case text is never exported; ingest succeeds when the collector is down; no export when the endpoint is empty.
+- **OpenTelemetry (pytest):** span mapping for a message and a paired tool call/result; stable ids across a second export; content attributes absent by default; a boundary violation exports a boolean and not the path; eval case text is never exported; ingest succeeds when the collector is down; no export when the endpoint is empty.
 - **Path boundary (pytest):** a file tool inside cwd is quiet; `../` and an absolute path outside cwd alert; a relative path resolves against the recorded cwd; a missing cwd produces no alerts; a shell command alerts only on an absolute path outside cwd; a dismissal hides that prefix and survives reindex.
-- **Benchmark (pytest):** freezing a case copies the prompt, model, usage, and tool/path summary into `user.db`; a full reindex leaves the case in place; summary pass rate and cost group by model; deleting a case removes only that row.
+- **Evals (pytest):** freezing a case copies the prompt, model, usage, and tool/path summary into `user.db`; a full reindex leaves the case in place; summary pass rate and cost group by model; deleting a case removes only that row.
 - **Manual:** `docker compose up` against real `~/.claude` and `~/.codex` folders. Confirm a collector receives traces only after an endpoint is configured.
 
 ---
@@ -331,7 +331,7 @@ volumes:
 | M5 | Search (FTS5), Sources page, polish, raw view | Search deep-links to events; README is complete |
 | M6 | OpenTelemetry export | With an endpoint set, a collector receives one trace per session and tool spans carry status and usage. Content is absent unless enabled. With no endpoint, ingest and the UI behave as before |
 | M7 | Path-boundary alerts | Sessions show outside-cwd file and shell paths. Dismissals stick. No project directory is mounted to answer the check |
-| M8 | Private benchmark | A frozen case survives reindex, takes a pass/fail verdict, and the summary compares models on those cases. The app never calls a model provider |
+| M8 | Private evals | A frozen case survives reindex, takes a pass/fail verdict, and the summary compares models on those cases. The app never calls a model provider |
 
 ---
 
@@ -371,7 +371,7 @@ No git and no working tree. The check compares paths found in tool calls with th
 
 ---
 
-## 15. Private benchmark
+## 15. Private evals
 
 A case is a copy of work you already did, plus a verdict you assign. Comparison is across those cases. Nothing is sent to a model provider.
 
@@ -399,6 +399,6 @@ The summary groups cases by model (and can filter by project): count, pass rate 
 - **Host and container path mismatch:** store both and group by the recorded host `cwd`.
 - **Export duplicates spans on reindex:** derive trace and span ids from stable session and event ids.
 - **Collector unreachable:** ingest commits first; export failure is recorded and retried on the next run.
-- **Transcript text leaving the machine:** content attributes are off unless `include_content` is set. The default export is structure and usage only. Benchmark cases are user data and are not exported.
+- **Transcript text leaving the machine:** content attributes are off unless `include_content` is set. The default export is structure and usage only. Eval cases are user data and are not exported.
 - **Path boundary is lexical:** `..` is caught, symlink escapes are not, because the project tree is not mounted. Shell alerts trust absolute paths only. Compare host path to host cwd, both as recorded in the transcript.
-- **A benchmark verdict is yours:** pass/fail is a label you set. The app does not infer correctness from git, and it does not replay the prompt.
+- **An eval verdict is yours:** pass/fail is a label you set. The app does not infer correctness from git, and it does not replay the prompt.

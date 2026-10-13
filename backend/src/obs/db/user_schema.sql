@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS boundary_dismissals (
   PRIMARY KEY (project_id, path_prefix)
 );
 
-CREATE TABLE IF NOT EXISTS benchmark_cases (
+CREATE TABLE IF NOT EXISTS eval_cases (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
   project_id TEXT,
@@ -47,5 +47,5 @@ CREATE TABLE IF NOT EXISTS benchmark_cases (
   updated_at TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_benchmark_model ON benchmark_cases(model);
-CREATE INDEX IF NOT EXISTS idx_benchmark_project ON benchmark_cases(project_id);
+CREATE INDEX IF NOT EXISTS idx_eval_model ON eval_cases(model);
+CREATE INDEX IF NOT EXISTS idx_eval_project ON eval_cases(project_id);

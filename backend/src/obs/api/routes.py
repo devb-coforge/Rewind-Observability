@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
-from obs.benchmark import delete_case, freeze_case, get_case, list_cases, summarize, update_case
+from obs.evals import delete_case, freeze_case, get_case, list_cases, summarize, update_case
 from obs.analytics import queries
 from obs.export_run import export_pending
 from obs.ingest.pipeline import Ingestor, SourceAccessError
@@ -409,7 +409,7 @@ def delete_dismissal(request: Request, project_id: str, path_prefix: str) -> dic
     return {"project_id": project_id, "path_prefix": path_prefix}
 
 
-@router.post("/benchmark/cases")
+@router.post("/evals/cases")
 def post_case(body: FreezeBody, request: Request) -> dict:
     obs = state(request)
     with obs.store.transaction():
@@ -425,7 +425,7 @@ def post_case(body: FreezeBody, request: Request) -> dict:
             raise HTTPException(404, "session not found") from None
 
 
-@router.get("/benchmark/cases")
+@router.get("/evals/cases")
 def get_cases(
     request: Request,
     project: str | None = None,
@@ -437,7 +437,7 @@ def get_cases(
         return {"cases": list_cases(obs.store, project=project, model=model, verdict=verdict)}
 
 
-@router.get("/benchmark/cases/{case_id}")
+@router.get("/evals/cases/{case_id}")
 def get_one_case(case_id: str, request: Request) -> dict:
     obs = state(request)
     with obs.store.transaction():
@@ -447,7 +447,7 @@ def get_one_case(case_id: str, request: Request) -> dict:
     return case
 
 
-@router.patch("/benchmark/cases/{case_id}")
+@router.patch("/evals/cases/{case_id}")
 def patch_case(case_id: str, body: CasePatch, request: Request) -> dict:
     obs = state(request)
     with obs.store.transaction():
@@ -460,7 +460,7 @@ def patch_case(case_id: str, body: CasePatch, request: Request) -> dict:
     return case
 
 
-@router.delete("/benchmark/cases/{case_id}")
+@router.delete("/evals/cases/{case_id}")
 def remove_case(case_id: str, request: Request) -> dict:
     obs = state(request)
     with obs.store.transaction():
@@ -470,8 +470,8 @@ def remove_case(case_id: str, request: Request) -> dict:
     return {"deleted": case_id}
 
 
-@router.get("/benchmark/summary")
-def benchmark_summary(request: Request, project: str | None = None, group_by: str = "model") -> dict:
+@router.get("/evals/summary")
+def evals_summary(request: Request, project: str | None = None, group_by: str = "model") -> dict:
     del group_by
     obs = state(request)
     with obs.store.transaction():

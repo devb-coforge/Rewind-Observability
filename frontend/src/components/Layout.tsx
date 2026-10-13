@@ -9,7 +9,7 @@ const links = [
   { to: "/", label: "Sessions", end: true, icon: List },
   { to: "/analytics", label: "Analytics", end: false, icon: BarChart3 },
   { to: "/search", label: "Search", end: false, icon: Search },
-  { to: "/benchmark", label: "Benchmark", end: false, icon: FlaskConical },
+  { to: "/evals", label: "Evals", end: false, icon: FlaskConical },
   { to: "/sources", label: "Sources", end: false, icon: Database },
 ];
 
@@ -30,7 +30,7 @@ export function Layout() {
               <div className="size-2.5 rounded-sm bg-bg" />
             </div>
             <div className="leading-tight">
-              <div className="text-[13px] font-semibold tracking-tight">Obs</div>
+              <div className="text-[13px] font-semibold tracking-tight">Rewind</div>
               <div className="text-2xs text-subtle">Agent transcripts</div>
             </div>
           </div>

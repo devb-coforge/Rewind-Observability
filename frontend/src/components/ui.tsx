@@ -1,6 +1,7 @@
 import { ChevronDown, Loader2 } from "lucide-react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
-import { agentColor, agentLabel } from "../lib/format";
+import { AgentIcon } from "./AgentIcon";
+import { agentLabel } from "../lib/format";
 import { cn } from "../lib/cn";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -105,9 +106,9 @@ export function Badge({ tone = "neutral", className, children }: { tone?: Tone; 
 
 export function AgentBadge({ agent }: { agent: string }) {
   return (
-    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 whitespace-nowrap rounded border border-line-strong bg-surface2 px-1.5 text-2xs font-medium text-muted">
-      <span aria-hidden="true" className="size-1.5 rounded-full" style={{ background: agentColor(agent) }} />
-      {agentLabel(agent)}
+    <span title={agentLabel(agent)} className="inline-flex h-5 shrink-0 items-center justify-center rounded border border-line-strong bg-surface2 px-1.5 text-2xs font-medium text-muted">
+      <AgentIcon agent={agent} className="size-3" />
+      <span className="sr-only">{agentLabel(agent)}</span>
     </span>
   );
 }

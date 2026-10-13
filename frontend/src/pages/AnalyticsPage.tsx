@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState, type ReactElement } from "react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api/client";
+import { AgentIcon, hasAgentIcon } from "../components/AgentIcon";
 import { AgentOptions, Card, Checkbox, Input, Page, PageHeader, Select, Toolbar } from "../components/ui";
 import { agentColor, agentLabel, formatCompact, formatCost, formatDuration } from "../lib/format";
 
@@ -113,7 +114,10 @@ export function AnalyticsPage() {
         />
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
-        <ChartCard title="Sessions by day" legend={agentKeys.map((key) => ({ label: agentLabel(key), color: agentColor(key) }))}>
+        <ChartCard
+          title="Sessions by day"
+          legend={agentKeys.map((key) => ({ label: agentLabel(key), color: agentColor(key), agent: key }))}
+        >
           <LineChart data={sessionChart} margin={chartMargin}>
             <CartesianGrid {...grid} />
             <XAxis dataKey="bucket" {...axis} tickFormatter={shortDate} minTickGap={24} />
@@ -242,9 +246,13 @@ function ChartTooltip({
       <div className="mb-1.5 font-medium text-ink">{label && labelFormat ? labelFormat(label) : label}</div>
       <div className="space-y-1">
         {payload.map((entry) => (
-          <div key={entry.dataKey ?? entry.name} className="flex items-center gap-2">
-            <span aria-hidden="true" className="size-2 rounded-sm" style={{ background: entry.color }} />
-            <span className="max-w-40 truncate text-muted">{entry.name}</span>
+          <div key={entry.dataKey ?? entry.name} title={entry.name} className="flex items-center gap-2">
+            {typeof entry.dataKey === "string" && hasAgentIcon(entry.dataKey) ? (
+              <AgentIcon agent={entry.dataKey} className="size-3" />
+            ) : (
+              <span aria-hidden="true" className="size-2 rounded-sm" style={{ background: entry.color }} />
+            )}
+            <span className={typeof entry.dataKey === "string" && hasAgentIcon(entry.dataKey) ? "sr-only" : "max-w-40 truncate text-muted"}>{entry.name}</span>
             <span className="ml-auto pl-3 tabular-nums text-ink">
               {entry.value == null ? "—" : valueFormat ? valueFormat(entry.value) : entry.value.toLocaleString()}
             </span>
@@ -273,7 +281,7 @@ function ChartCard({
   children,
 }: {
   title: string;
-  legend?: { label: string; color: string }[];
+  legend?: { label: string; color: string; agent?: string }[];
   empty?: string | false;
   responsive?: boolean;
   children: ReactElement;
@@ -285,9 +293,13 @@ function ChartCard({
         {legend?.length ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             {legend.map((item) => (
-              <span key={item.label} className="flex items-center gap-1.5 text-2xs text-muted">
-                <span aria-hidden="true" className="size-2 rounded-sm" style={{ background: item.color }} />
-                {item.label}
+              <span key={item.label} title={item.label} className="flex items-center gap-1.5 text-2xs text-muted">
+                {item.agent && hasAgentIcon(item.agent) ? (
+                  <AgentIcon agent={item.agent} className="size-3" />
+                ) : (
+                  <span aria-hidden="true" className="size-2 rounded-sm" style={{ background: item.color }} />
+                )}
+                <span className={item.agent && hasAgentIcon(item.agent) ? "sr-only" : undefined}>{item.label}</span>
               </span>
             ))}
           </div>
@@ -303,3 +315,5 @@ function ChartCard({
     </Card>
   );
 }
+Codex
+3 sessio
