@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS events (
   tool_input_json TEXT,
   tool_output_preview TEXT,
   is_error INTEGER NOT NULL DEFAULT 0,
+  is_declined INTEGER NOT NULL DEFAULT 0,
   model TEXT,
   usage_json TEXT,
   usage_origin TEXT,

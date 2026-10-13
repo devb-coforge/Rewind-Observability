@@ -98,7 +98,8 @@ function inputPreview(raw: string | null): string {
   }
 }
 
-function FailureSearchView() {
+function FailureSearchView({ declined = false }: { declined?: boolean }) {
+  const [applied, setApplied] = useState({ agent: "", tool: "", q: "" });
   const [agent, setAgent] = useState("");
   const [tool, setTool] = useState("");
   const [q, setQ] = useState("");
@@ -106,11 +107,13 @@ function FailureSearchView() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
-  async function load(next: { agent: string; tool: string; q: string }) {
+  async function load(next: { agent: string; tool: string; q: string }, offset = 0) {
     setPending(true);
     setError("");
     try {
-      setData(await api.searchFailures(next));
+      if (!offset) setApplied(next);
+      const body = declined ? await api.searchDeclined({ ...next, offset }) : await api.searchFailures(next);
+      setData((previous) => offset && previous ? { ...body, hits: [...previous.hits, ...body.hits] } : body);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
     } finally {
@@ -135,14 +138,15 @@ function FailureSearchView() {
 
   return (
     <>
+      {declined ? <p className="mb-4 text-[13px] text-muted">Commands and tool requests explicitly declined by the user.</p> : null}
       <form className="mb-4 flex flex-wrap gap-2" onSubmit={onSubmit}>
         <Input
           className="min-w-64 flex-1 [&_input]:h-9"
           icon={<Search className="size-4" />}
           value={q}
           onChange={(event) => setQ(event.target.value)}
-          placeholder="Filter by command or error text"
-          aria-label="Filter failed tool calls"
+          placeholder={declined ? "Filter by command or decline reason" : "Filter by command or error text"}
+          aria-label={declined ? "Filter user-declined commands" : "Filter failed tool calls"}
         />
         <Select
           className="w-36 [&_select]:h-9"
@@ -161,7 +165,7 @@ function FailureSearchView() {
       </form>
       {error ? <ErrorText>{error}</ErrorText> : null}
       {data && data.by_tool.length > 0 ? (
-        <div className="mb-4 flex flex-wrap items-center gap-1.5" aria-label="Failures by tool">
+        <div className="mb-4 flex flex-wrap items-center gap-1.5" aria-label={declined ? "User declines by tool" : "Failures by tool"}>
           <button
             type="button"
             onClick={() => pickTool("")}
@@ -182,7 +186,7 @@ function FailureSearchView() {
         </div>
       ) : null}
       {data && data.hits.length === 0 ? (
-        <EmptyState icon={<SearchX className="size-6" />} title="No failed tool calls." description="Nothing matches these filters." />
+        <EmptyState icon={<SearchX className="size-6" />} title={declined ? "No user-declined commands." : "No failed tool calls."} description="Nothing matches these filters." />
       ) : null}
       <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface shadow-card empty:hidden">
         {(data?.hits ?? []).map((hit) => (
@@ -201,6 +205,7 @@ function FailureSearchView() {
               <div className="mt-1 flex flex-wrap items-center gap-2 text-2xs text-subtle">
                 <AgentBadge agent={hit.agent} />
                 <Badge>{hit.tool_name}</Badge>
+                {declined ? <Badge tone="warn">User declined</Badge> : null}
                 <span>{hit.project_name || "(unknown)"}</span>
                 <span aria-hidden="true">·</span>
                 <span className="tabular-nums">{formatTime(hit.ts)}</span>
@@ -215,12 +220,17 @@ function FailureSearchView() {
           </li>
         ))}
       </ul>
+      {declined && data?.next_offset != null ? (
+        <Button className="mt-4" disabled={pending} onClick={() => void load(applied, data.next_offset!)}>
+          {pending ? "Loading…" : "Load more"}
+        </Button>
+      ) : null}
     </>
   );
 }
 
 export function SearchPage() {
-  const [mode, setMode] = useState<"text" | "failures">("text");
+  const [mode, setMode] = useState<"text" | "failures" | "declined">("text");
   return (
     <Page className="max-w-4xl">
       <PageHeader title="Search" />
@@ -229,6 +239,7 @@ export function SearchPage() {
           [
             ["text", "Text"],
             ["failures", "Failed tool calls"],
+            ["declined", "User declined"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -243,7 +254,7 @@ export function SearchPage() {
           </button>
         ))}
       </div>
-      {mode === "text" ? <TextSearch /> : <FailureSearchView />}
+      {mode === "text" ? <TextSearch /> : <FailureSearchView key={mode} declined={mode === "declined"} />}
     </Page>
   );
 }

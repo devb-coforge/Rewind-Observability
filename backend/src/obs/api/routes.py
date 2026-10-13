@@ -307,6 +307,25 @@ def search_failures(
         )
 
 
+@router.get("/search/declined")
+def search_declined(
+    request: Request,
+    agent: str | None = None,
+    project: str | None = None,
+    tool: str | None = None,
+    q: str | None = None,
+    include_hidden: bool = False,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    obs = state(request)
+    with obs.store.transaction():
+        return queries.failed_tools(
+            obs.store, agent=agent, project=project, tool=tool, q=q,
+            include_hidden=include_hidden, limit=limit, declined=True, offset=max(0, offset),
+        )
+
+
 @router.get("/analytics/summary")
 def analytics_summary(
     request: Request,

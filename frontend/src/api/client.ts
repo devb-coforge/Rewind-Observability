@@ -96,6 +96,8 @@ export const api = {
   search: (filters: Filters & { q: string }) => request<{ hits: SearchHit[] }>(`/api/search${query(filters)}`),
   searchFailures: (filters: Filters & { tool?: string; q?: string }) =>
     request<FailureSearch>(`/api/search/failures${query(filters)}`),
+  searchDeclined: (filters: Filters & { tool?: string; q?: string; offset?: number }) =>
+    request<FailureSearch>(`/api/search/declined${query(filters)}`),
   summary: (filters: Filters) => request<Summary>(`/api/analytics/summary${query(filters)}`),
   timeseries: (filters: Filters & { metric: string; bucket?: string; group_by?: string }) =>
     request<{ metric: string; bucket: string; group_by: string | null; points: SeriesPoint[] }>(

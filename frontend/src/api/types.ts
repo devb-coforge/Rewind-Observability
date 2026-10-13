@@ -79,6 +79,7 @@ export type ObsEvent = {
   tool_input: Record<string, unknown> | null;
   tool_output_preview: string | null;
   is_error: boolean;
+  is_declined?: boolean;
   model: string | null;
   usage: Usage | null;
   raw: { path: string; offset: number; length: number };
@@ -123,6 +124,7 @@ export type FailureHit = {
 };
 
 export type FailureSearch = {
+  next_offset?: number | null;
   total: number;
   by_tool: { tool_name: string; count: number }[];
   hits: FailureHit[];

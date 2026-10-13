@@ -64,10 +64,13 @@ def failed_tools(
     q: str | None,
     include_hidden: bool,
     limit: int,
+    declined: bool = False,
+    offset: int = 0,
 ) -> dict:
     where, params = store._session_filters(
         {"agent": agent, "project": project, "include_hidden": include_hidden}
     )
+    outcome = "r.is_declined = 1" if declined else "r.is_error = 1 AND r.is_declined = 0"
     base = f"""
         FROM events r
         JOIN sessions s ON s.id = r.session_id
@@ -75,7 +78,7 @@ def failed_tools(
           ON c.session_id = r.session_id
          AND c.kind = 'tool_call'
          AND c.tool_call_id = r.tool_call_id
-        WHERE r.kind = 'tool_result' AND r.is_error = 1 AND {where}
+        WHERE r.kind = 'tool_result' AND {outcome} AND {where}
     """
     by_tool = [
         {"tool_name": row["tool_name"], "count": row["n"]}
@@ -105,12 +108,15 @@ def failed_tools(
                r.tool_output_preview AS error_preview,
                s.title AS session_title, s.project_name, s.agent, s.project_id
         {base} {extra}
-        ORDER BY COALESCE(r.ts, '') DESC
-        LIMIT ?
+        ORDER BY COALESCE(r.ts, '') DESC, r.id
+        LIMIT ? OFFSET ?
         """,
-        [*params, *extra_params, min(limit, 100)],
+        [*params, *extra_params, max(1, min(limit, 100)), max(0, offset)],
     )
+    rows = list(rows)
+    filtered_total = store.index.execute(f"SELECT COUNT(*) {base} {extra}", [*params, *extra_params]).fetchone()[0]
     return {
+        "next_offset": offset + len(rows) if offset + len(rows) < filtered_total else None,
         "by_tool": by_tool,
         "total": sum(item["count"] for item in by_tool),
         "hits": [dict(row) for row in rows],

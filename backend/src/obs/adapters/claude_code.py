@@ -37,7 +37,7 @@ def title_prompt(text: str) -> str | None:
 
 class ClaudeCodeAdapter:
     name = "claude_code"
-    version = 3
+    version = 4
 
     def session_titles(self, root: Path) -> dict[str, str] | None:
         ai_titles: dict[str, str] = {}

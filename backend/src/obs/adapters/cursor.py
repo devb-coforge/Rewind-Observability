@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 class CursorAdapter:
     name = "cursor"
-    version = 1
+    version = 2
 
     def detect(self, root: Path) -> bool:
         return infer_agent_from_path(root) == self.name

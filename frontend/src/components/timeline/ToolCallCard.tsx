@@ -30,6 +30,7 @@ export function ToolCallCard({ call, result, expanded, onExpandedChange, onRaw }
   const newString = stringField(input, "new_string");
   const content = stringField(input, "content") || stringField(input, "contents");
   const edits = Array.isArray(input?.edits) ? input.edits : [];
+  const declined = call.is_declined || result?.is_declined;
   const failed = call.is_error || Boolean(result?.is_error);
   const outside = [...(call.paths || []), ...(result?.paths || [])].some((item) => item.outside && !item.allowed);
   const [output, setOutput] = useState(result?.text || result?.tool_output_preview || call.tool_output_preview || "");
@@ -72,7 +73,9 @@ export function ToolCallCard({ call, result, expanded, onExpandedChange, onRaw }
           {command || path || patch?.split("\n")[0] || ""}
         </span>
         {outside ? <Badge tone="warn">outside project</Badge> : null}
-        {failed ? (
+        {declined ? (
+          <Badge tone="warn">User declined</Badge>
+        ) : failed ? (
           <Badge tone="danger">error</Badge>
         ) : result ? (
           <span className="flex shrink-0 items-center gap-1.5 text-2xs text-subtle">

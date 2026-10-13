@@ -14,6 +14,7 @@ from obs.analytics.pricing import Pricing
 from obs.gitroot import git_worktree_root
 from obs.identity import classify_paths, path_is_allowed, project_identity
 from obs.models import Usage
+from obs.tool_outcomes import user_declined
 
 SCHEMA = (Path(__file__).with_name("schema.sql")).read_text()
 USER_SCHEMA = (Path(__file__).with_name("user_schema.sql")).read_text()
@@ -45,6 +46,9 @@ class Store:
             self.index.execute("ALTER TABLE sessions ADD COLUMN selected_model TEXT")
         if "source_duration_sec" not in columns:
             self.index.execute("ALTER TABLE sessions ADD COLUMN source_duration_sec REAL")
+        event_columns = {row["name"] for row in self.index.execute("PRAGMA table_info(events)")}
+        if "is_declined" not in event_columns:
+            self.index.execute("ALTER TABLE events ADD COLUMN is_declined INTEGER NOT NULL DEFAULT 0")
         self.user.executescript(USER_SCHEMA)
         user_tables = {
             row["name"] for row in self.user.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -221,13 +225,14 @@ class Store:
         )
 
     def insert_event(self, event: dict) -> bool:
+        declined = event.get("is_declined", False) or (event["kind"] == "tool_result" and user_declined(event.get("tool_output") or event.get("text")))
         cur = self.index.execute(
             """
             INSERT OR IGNORE INTO events(
               id, session_id, parent_id, seq, ts, role, kind, text, tool_name, tool_call_id,
-              tool_input_json, tool_output_preview, is_error, model, usage_json, usage_origin,
+              tool_input_json, tool_output_preview, is_error, is_declined, model, usage_json, usage_origin,
               message_id, raw_path, raw_offset, raw_length, paths_json, block_index
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event["id"],
@@ -242,7 +247,8 @@ class Store:
                 event.get("tool_call_id"),
                 event.get("tool_input_json"),
                 event.get("tool_output_preview"),
-                1 if event.get("is_error") else 0,
+                1 if event.get("is_error") and not declined else 0,
+                1 if declined else 0,
                 event.get("model"),
                 event.get("usage_json"),
                 event.get("usage_origin"),
@@ -870,6 +876,7 @@ class Store:
             "tool_input": tool_input,
             "tool_output_preview": row["tool_output_preview"],
             "is_error": bool(row["is_error"]),
+            "is_declined": bool(row["is_declined"]),
             "model": row["model"],
             "usage": usage.as_dict() if usage else None,
             "raw": {"path": row["raw_path"], "offset": row["raw_offset"], "length": row["raw_length"]},

@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 class CodexAdapter:
     name = "codex"
-    version = 3
+    version = 5
 
     def detect(self, root: Path) -> bool:
         return infer_agent_from_path(root) == "codex"

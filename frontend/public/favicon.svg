@@ -4,16 +4,19 @@
       <stop stop-color="#1c1c24"/>
       <stop offset="1" stop-color="#09090b"/>
     </linearGradient>
-    <linearGradient id="fg" x1="16" y1="14" x2="48" y2="50" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#b4bcff"/>
-      <stop offset="1" stop-color="#8b97ff"/>
+    <linearGradient id="fg" x1="50" y1="50" x2="14" y2="14" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7f8cff"/>
+      <stop offset="1" stop-color="#c7ccff"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#bg)"/>
-  <!-- "R" drawn as rounded trace spans: stem, top span, mid span, trailing leg -->
-  <g stroke="url(#fg)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M19.5 14.5v35"/>
-    <path d="M19.5 17.5h14a8.5 8.5 0 0 1 0 17h-14"/>
-    <path d="M32 36l12 13.5" opacity="0.7"/>
+  <!-- rewind arc: sweeps counter-clockwise, arrowhead at upper left -->
+  <path d="M11.5 34A21 21 0 1 0 17.5 19.5" stroke="url(#fg)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M9 23.5l12-9 1 13z" fill="#c7ccff" stroke="#c7ccff" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- trace waterfall: staggered spans, last one is the playhead -->
+  <g stroke-width="4.5" stroke-linecap="round">
+    <path d="M28 28h9" stroke="#b4bcff" opacity="0.5"/>
+    <path d="M30.5 34h12" stroke="#b4bcff" opacity="0.8"/>
+    <path d="M35 40h7.5" stroke="#ffffff"/>
   </g>
 </svg>

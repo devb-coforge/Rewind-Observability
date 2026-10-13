@@ -2,6 +2,10 @@
 
 Cost estimates, OpenTelemetry export, path alerts, and evals.
 
+## Search
+
+Search has separate Text, Failed tool calls, and User declined views. User declined lists commands and tool requests with an explicit recorded user refusal, with agent and tool filters, command/reason search, links to the session event, and Load more for remaining results. Declines have a User declined badge in the timeline and are excluded from tool error counts. Cancellation alone, operating-system permission errors, and automatic approval-review rejections do not establish a user refusal. Rescan refreshes existing transcripts after upgrading; Cursor decisions also require its User metadata directory to be available.
+
 ## Pricing
 
 By default, prices come from OpenRouter's public `https://openrouter.ai/api/v1/models` catalog. No API key is required. The catalog is cached in `openrouter-pricing.json` in the data directory for 24 hours, and refreshed on startup or rescan when stale. Charts read stored estimates without calling OpenRouter. A failed refresh keeps the last successful cache; failures without a cache leave costs unknown and are retried on a later rescan (at most once every five minutes).

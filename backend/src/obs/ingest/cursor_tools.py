@@ -10,6 +10,7 @@ import json
 import re
 
 from obs.adapters.lineio import preview
+from obs.tool_outcomes import user_declined
 
 NAMES = {
     "read_file_v2": "Read", "run_terminal_command_v2": "Shell",
@@ -57,7 +58,7 @@ def sync_tools(store, session, records):
     sid = session["id"]
     # Rebuild this derived slice when SQLite changes, even when JSONL does not.
     unique = {record["key"]: record for record in records}
-    fingerprint = hashlib.sha256(json.dumps(unique, sort_keys=True).encode()).hexdigest()
+    fingerprint = hashlib.sha256(("declines-v1:" + json.dumps(unique, sort_keys=True)).encode()).hexdigest()
     meta_key = f"cursor_tools:{sid}"
     old = list(store.index.execute(
         "SELECT rowid, id FROM events WHERE session_id = ? AND id LIKE 'cursor-db:%'", (sid,)))
@@ -81,12 +82,13 @@ def sync_tools(store, session, records):
         tool = record["bubble"]["toolFormerData"]
         output = tool.get("result")
         error = tool.get("error")
+        declined = user_declined(tool) or user_declined(output)
         decoded = _object(output)
         code = decoded.get("exitCode")
         failed = (tool.get("status") in {"error", "failed"} or bool(error)
                   or bool(decoded.get("error")) or decoded.get("success") is False
                   or (isinstance(code, int) and not isinstance(code, bool) and code != 0))
-        if output in (None, "") and not failed:
+        if output in (None, "") and not failed and not declined:
             continue
         eid = "cursor-db:" + record["key"]
         native_call_id = tool.get("toolCallId")
@@ -97,24 +99,43 @@ def sync_tools(store, session, records):
                          and _compatible(c, tool)), None)
         link = eid
         name = NAMES.get(tool.get("name"), tool.get("name") or "tool")
+        if call is None and declined:
+            # Preserve refused command arguments even when JSONL omitted the call.
+            args = _object(tool.get("rawArgs")) or _object(tool.get("params"))
+            store.insert_event({
+                "id": eid + ":call", "session_id": sid, "kind": "tool_call", "role": "assistant",
+                "tool_name": name, "tool_call_id": eid, "tool_input_json": json.dumps(args),
+                "raw_path": session["source_path"], "raw_offset": 2**60 + ordinal,
+                "raw_length": 0, "block_index": 0,
+            })
+            store.index.execute("INSERT INTO event_raw(event_id, content) VALUES (?, ?)",
+                                (eid + ":call", json.dumps(record, ensure_ascii=False)))
         if call is not None:
             used.add(call["id"])
             link = call["tool_call_id"] or eid
             name = call["tool_name"]
             store.index.execute("UPDATE events SET tool_call_id = ? WHERE id = ?", (link, call["id"]))
             # A transcript-provided result already covers this call.
-            if store.index.execute("SELECT 1 FROM events WHERE session_id = ? AND kind = 'tool_result' AND tool_call_id = ?",
-                                   (sid, link)).fetchone():
+            existing_result = store.index.execute(
+                "SELECT id FROM events WHERE session_id = ? AND kind = 'tool_result' AND tool_call_id = ?",
+                (sid, link),
+            ).fetchone()
+            if existing_result:
+                if declined:
+                    store.index.execute("UPDATE events SET is_declined = 1, is_error = 0 WHERE id = ?",
+                                        (existing_result["id"],))
                 continue
         if not isinstance(output, str):
             output = json.dumps(output, ensure_ascii=False) if output is not None else ""
         if error:
             output += "\n" + (error if isinstance(error, str) else json.dumps(error))
+        if declined and not output:
+            output = "User declined this command."
         offset = call["raw_offset"] if call else 2**60 + ordinal
-        block = call["block_index"] + 1 if call else 0
+        block = call["block_index"] + 1 if call else 1
         store.insert_event({
             "id": eid, "session_id": sid, "kind": "tool_result", "role": "tool",
-            "tool_name": name, "tool_call_id": link, "is_error": failed,
+            "tool_name": name, "tool_call_id": link, "is_error": failed and not declined, "is_declined": declined,
             "tool_output": output, "tool_output_preview": preview(output), "fts_preview": output[:500],
             "raw_path": call["raw_path"] if call else session["source_path"],
             "raw_offset": offset, "raw_length": 0, "block_index": block,
