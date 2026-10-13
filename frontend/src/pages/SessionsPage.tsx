@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import { SessionGroups } from "../components/SessionGroups";
 import { AgentOptions, Button, ErrorText, Input, Loading, Page, PageHeader, Select, Toolbar } from "../components/ui";
-import { groupProjectsByPath } from "../lib/projects";
+import { groupProjectsByPath, projectFilters } from "../lib/projects";
 
 export function SessionsPage() {
   const queryClient = useQueryClient();
@@ -19,8 +19,7 @@ export function SessionsPage() {
 
   const filters = {
     agent,
-    project: project.startsWith("id:") ? project.slice(3) : "",
-    project_cwd: project.startsWith("path:") ? project.slice(5) : "",
+    ...projectFilters(project),
     model, from, to, q, sort, include_hidden: includeHidden,
   };
   const projects = useQuery({

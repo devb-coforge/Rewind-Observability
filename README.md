@@ -1,13 +1,11 @@
-# Obs
+# Rewind Observability
 
-A single-user web app that indexes local agent transcripts. It is a transcript viewer, a usage tracker, an OpenTelemetry export, path-boundary alerts, and a private evals. The transcript files stay read-only. Notes, hidden projects, path allows, and eval cases live in a separate database on the app volume.
-
-Usage and cost are estimates for understanding activity. They are not billing numbers. Missing usage stays unknown.
+A full stack web app that indexes local agent transcripts. It has a transcript viewer, a usage tracker, an OpenTelemetry export, path-boundary alerts, and private evals. T
 
 ## Run with Docker
 
 ```bash
-PUID=$(id -u) PGID=$(id -g) docker compose up --build
+docker compose up --build
 ```
 
 Open http://127.0.0.1:8080. The port is bound to localhost only.
@@ -158,6 +156,9 @@ npm run gen:api
 ## Tests
 
 ```bash
-cd backend && uv run pytest
+cd backend && uv run pytest tests/
+cd backend && uv run pytest tests/ --cov=obs --cov-report=term-missing
 cd frontend && npm test
 ```
+
+Backend coverage needs the `dev` extra (`uv sync --extra dev`). The second command prints per-file line coverage and a total percentage for the `obs` package.

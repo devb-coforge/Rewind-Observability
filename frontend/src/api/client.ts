@@ -124,7 +124,7 @@ export const api = {
         to_seq: toSeq ?? null,
       }),
     }),
-  cases: (filters: { project?: string; model?: string; verdict?: string }) =>
+  cases: (filters: { project?: string; project_cwd?: string; model?: string; verdict?: string }) =>
     request<{ cases: EvalCase[] }>(`/api/evals/cases${query(filters)}`),
   case: (id: string) => request<EvalCase>(`/api/evals/cases/${encodeURIComponent(id)}`),
   patchCase: (id: string, body: { verdict?: string; note?: string }) =>
@@ -134,6 +134,6 @@ export const api = {
     }),
   deleteCase: (id: string) =>
     request<{ deleted: string }>(`/api/evals/cases/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  evalsSummary: (project?: string) =>
-    request<{ note: string; groups: EvalGroup[] }>(`/api/evals/summary${query({ project, group_by: "model" })}`),
+  evalsSummary: (filters: { project?: string; project_cwd?: string } = {}) =>
+    request<{ note: string; groups: EvalGroup[] }>(`/api/evals/summary${query({ ...filters, group_by: "model" })}`),
 };

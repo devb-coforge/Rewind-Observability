@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { AgentIcon, hasAgentIcon } from "../components/AgentIcon";
 import { AgentOptions, Card, Checkbox, Input, Page, PageHeader, Select, Toolbar } from "../components/ui";
 import { agentColor, agentLabel, formatCompact, formatCost, formatDuration } from "../lib/format";
+import { groupProjectsByPath, projectFilters } from "../lib/projects";
 
 type Filters = { agent: string; project: string; model: string; from: string; to: string };
 
@@ -15,7 +16,7 @@ const palette = ["#8b97ff", "#4fc8a8", "#e08a6a", "#e5b94e", "#c48cf0", "#5fb4e8
 export function AnalyticsPage() {
   const [filters, setFilters] = useState<Filters>({ agent: "", project: "", model: "", from: "", to: "" });
   const [includeHidden, setIncludeHidden] = useState(false);
-  const queryFilters = { ...filters, include_hidden: includeHidden };
+  const queryFilters = { ...filters, ...projectFilters(filters.project), include_hidden: includeHidden };
   const projects = useQuery({ queryKey: ["projects", true], queryFn: () => api.projects(true) });
   const summary = useQuery({ queryKey: ["summary", queryFilters], queryFn: () => api.summary(queryFilters) });
   const sessions = useQuery({
@@ -31,7 +32,7 @@ export function AnalyticsPage() {
     queryFn: () =>
       api.timeseries({
         agent: filters.agent,
-        project: filters.project,
+        ...projectFilters(filters.project),
         from: filters.from,
         to: filters.to,
         include_hidden: includeHidden,
@@ -71,9 +72,9 @@ export function AnalyticsPage() {
         </Select>
         <Select className="w-48" aria-label="Project" value={filters.project} onChange={(event) => setFilters({ ...filters, project: event.target.value })}>
           <option value="">All projects</option>
-          {(projects.data?.projects ?? []).map((project) => (
-            <option key={project.project_id} value={project.project_id}>
-              {project.name}
+          {groupProjectsByPath(projects.data?.projects ?? []).map((group) => (
+            <option key={group.key} value={group.key} title={group.cwd || undefined}>
+              {group.name}
             </option>
           ))}
         </Select>

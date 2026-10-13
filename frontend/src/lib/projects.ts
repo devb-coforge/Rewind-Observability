@@ -1,5 +1,12 @@
 import type { Project } from "../api/types";
 
+export function projectFilters(selection: string) {
+  return {
+    project: selection.startsWith("id:") ? selection.slice(3) : "",
+    project_cwd: selection.startsWith("path:") ? selection.slice(5) : "",
+  };
+}
+
 // Paths are normalized by the backend. Missing paths must not merge unrelated workspaces.
 export function projectGroupKey(cwd: string | null, projectId: string): string {
   return cwd ? `path:${cwd}` : `id:${projectId}`;

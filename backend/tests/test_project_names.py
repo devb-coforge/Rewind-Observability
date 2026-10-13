@@ -162,3 +162,60 @@ def test_subdirectory_sessions_group_at_the_git_root(tmp_path):
         assert store.get_session("front2")["project_name"] == "Unified"
     finally:
         store.close()
+
+
+def test_analytics_repository_filter_includes_agents_and_cursor_alias(client):
+    store = client.app.state.obs.store
+    with store.transaction():
+        for sid, cwd, agent, source in (
+            ("cursor:alias", None, "cursor", "/tmp/cursor/projects/work-proj/agent-transcripts/alias.jsonl"),
+            ("other", "/other/proj", "codex", "/tmp/other.jsonl"),
+        ):
+            store.ensure_session({
+                "id": sid, "native_id": sid, "agent": agent, "project_id": sid,
+                "project_cwd": cwd, "project_name": "proj", "source_path": source,
+                "started_at": "2026-10-12T12:00:00.000Z", "tokens_in": 7,
+            })
+            store.index.execute("INSERT INTO session_models VALUES (?, ?)", (sid, sid))
+    params = {"project_cwd": "/work/proj"}
+    summary = client.get("/api/analytics/summary", params=params).json()
+    assert summary["sessions"] == 4
+    points = client.get("/api/analytics/timeseries", params={**params, "group_by": "model"}).json()["points"]
+    assert "cursor:alias" in {point["group"] for point in points}
+    assert "other" not in {point["group"] for point in points}
+    assert client.get("/api/analytics/summary", params={**params, "agent": "codex"}).json()["sessions"] == 1
+    codex = next(item for item in store.list_projects(True) if item["agent"] == "codex" and item["cwd"] == "/work/proj")
+    client.patch(f"/api/projects/{codex['project_id']}", json={"hidden": True})
+    assert client.get("/api/analytics/summary", params=params).json()["sessions"] == 3
+    assert client.get("/api/analytics/summary", params={**params, "include_hidden": True}).json()["sessions"] == 4
+    missing = {"project_cwd": "/missing"}
+    assert client.get("/api/analytics/summary", params=missing).json()["sessions"] == 0
+    assert client.get("/api/analytics/timeseries", params=missing).json()["points"] == []
+    assert client.get("/api/analytics/tools", params=missing).json()["tools"] == []
+
+
+def test_eval_repository_filter_includes_cursor_alias_and_excludes_same_name_elsewhere(client):
+    store = client.app.state.obs.store
+    sessions = client.get("/api/sessions").json()["sessions"]
+    for session in sessions:
+        assert client.post("/api/evals/cases", json={"session_id": session["id"]}).status_code == 200
+    with store.transaction():
+        store.ensure_session({
+            "id": "cursor:alias", "native_id": "alias", "agent": "cursor", "project_id": "cursor-id",
+            "project_name": "proj", "project_cwd": None,
+            "source_path": "/tmp/cursor/projects/work-proj/agent-transcripts/alias.jsonl",
+        })
+        snapshot = dict(store.user.execute("SELECT * FROM eval_cases LIMIT 1").fetchone())
+        for case_id, project_id, cwd in (("alias-case", "cursor-id", None), ("other-case", "other-id", "/other/proj")):
+            snapshot.update(id=case_id, project_id=project_id, project_cwd=cwd)
+            store.user.execute(
+                f"INSERT INTO eval_cases ({','.join(snapshot)}) VALUES ({','.join('?' for _ in snapshot)})",
+                list(snapshot.values()),
+            )
+    params = {"project_cwd": "/work/proj"}
+    cases = client.get("/api/evals/cases", params=params).json()["cases"]
+    assert len(cases) == len(sessions) + 1
+    assert "alias-case" in {item["id"] for item in cases}
+    assert "other-case" not in {item["id"] for item in cases}
+    assert sum(group["n"] for group in client.get("/api/evals/summary", params=params).json()["groups"]) == len(sessions) + 1
+    assert client.get("/api/evals/cases", params={"project_cwd": "/missing"}).json()["cases"] == []

@@ -316,6 +316,7 @@ def analytics_summary(
     request: Request,
     agent: str | None = None,
     project: str | None = None,
+    project_cwd: str | None = None,
     model: str | None = None,
     from_: str | None = Query(None, alias="from"),
     to: str | None = None,
@@ -323,6 +324,7 @@ def analytics_summary(
 ) -> dict:
     obs = state(request)
     filters = _filters(agent, project, model, from_, to, include_hidden)
+    filters["project_cwd"] = project_cwd
     with obs.store.transaction():
         return queries.summary(obs.store, filters)
 
@@ -335,6 +337,7 @@ def analytics_series(
     group_by: str | None = None,
     agent: str | None = None,
     project: str | None = None,
+    project_cwd: str | None = None,
     model: str | None = None,
     from_: str | None = Query(None, alias="from"),
     to: str | None = None,
@@ -342,6 +345,7 @@ def analytics_series(
 ) -> dict:
     obs = state(request)
     filters = _filters(agent, project, model, from_, to, include_hidden)
+    filters["project_cwd"] = project_cwd
     with obs.store.transaction():
         return queries.timeseries(obs.store, filters, metric=metric, bucket=bucket, group_by=group_by)
 
@@ -351,6 +355,7 @@ def analytics_tools(
     request: Request,
     agent: str | None = None,
     project: str | None = None,
+    project_cwd: str | None = None,
     model: str | None = None,
     from_: str | None = Query(None, alias="from"),
     to: str | None = None,
@@ -358,6 +363,7 @@ def analytics_tools(
 ) -> dict:
     obs = state(request)
     filters = _filters(agent, project, model, from_, to, include_hidden)
+    filters["project_cwd"] = project_cwd
     with obs.store.transaction():
         return queries.tools(obs.store, filters)
 
@@ -468,12 +474,13 @@ def post_case(body: FreezeBody, request: Request) -> dict:
 def get_cases(
     request: Request,
     project: str | None = None,
+    project_cwd: str | None = None,
     model: str | None = None,
     verdict: str | None = None,
 ) -> dict:
     obs = state(request)
     with obs.store.transaction():
-        return {"cases": list_cases(obs.store, project=project, model=model, verdict=verdict)}
+        return {"cases": list_cases(obs.store, project=project, project_cwd=project_cwd, model=model, verdict=verdict)}
 
 
 @router.get("/evals/cases/{case_id}")
@@ -510,11 +517,14 @@ def remove_case(case_id: str, request: Request) -> dict:
 
 
 @router.get("/evals/summary")
-def evals_summary(request: Request, project: str | None = None, group_by: str = "model") -> dict:
+def evals_summary(
+    request: Request, project: str | None = None, group_by: str = "model",
+    project_cwd: str | None = None,
+) -> dict:
     del group_by
     obs = state(request)
     with obs.store.transaction():
-        return summarize(obs.store, project=project)
+        return summarize(obs.store, project=project, project_cwd=project_cwd)
 
 
 def _filters(agent, project, model, start, end, include_hidden) -> dict:

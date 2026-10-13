@@ -116,12 +116,28 @@ def backfill_case_metadata(store: Store) -> None:
             )
 
 
-def list_cases(store: Store, *, project: str | None, model: str | None, verdict: str | None) -> list[dict]:
+def _project_path_filter(store: Store, cwd: str) -> tuple[str, list]:
+    ids = [pid for pid, path in store.project_group_paths().items() if path == cwd]
+    # Keep frozen cases searchable even when their original sessions are no longer indexed.
+    if not ids:
+        return "project_cwd = ?", [cwd]
+    marks = ",".join("?" for _ in ids)
+    return f"(project_cwd = ? OR project_id IN ({marks}))", [cwd, *ids]
+
+
+def list_cases(
+    store: Store, *, project: str | None, model: str | None, verdict: str | None,
+    project_cwd: str | None = None,
+) -> list[dict]:
     clauses = ["1=1"]
     params: list = []
     if project:
         clauses.append("project_id = ?")
         params.append(project)
+    if project_cwd:
+        clause, values = _project_path_filter(store, project_cwd)
+        clauses.append(clause)
+        params.extend(values)
     if model:
         clauses.append("model = ?")
         params.append(model)
@@ -170,23 +186,27 @@ def delete_case(store: Store, case_id: str) -> bool:
     return cur.rowcount > 0
 
 
-def summarize(store: Store, *, project: str | None) -> dict:
+def summarize(store: Store, *, project: str | None, project_cwd: str | None = None) -> dict:
     clauses = ["1=1"]
     params: list = []
     if project:
         clauses.append("project_id = ?")
         params.append(project)
+    if project_cwd:
+        clause, values = _project_path_filter(store, project_cwd)
+        clauses.append(clause)
+        params.extend(values)
     rows = list(
         store.user.execute(
             f"SELECT * FROM eval_cases WHERE {' AND '.join(clauses)}",
             params,
         )
     )
-    groups: dict[str, list] = {}
+    groups: dict[tuple[str, str], list] = {}
     for row in rows:
-        groups.setdefault(row["model"] or "(unknown)", []).append(row)
+        groups.setdefault((row["model"] or "(unknown)", row["agent"] or "(unknown)"), []).append(row)
     result = []
-    for model, items in sorted(groups.items()):
+    for (model, agent), items in sorted(groups.items()):
         verdicts = [item["verdict"] for item in items if item["verdict"] in {"pass", "fail"}]
         passes = sum(1 for item in verdicts if item == "pass")
         costs = [item["est_cost_usd"] for item in items if item["est_cost_usd"] is not None]
@@ -198,6 +218,7 @@ def summarize(store: Store, *, project: str | None) -> dict:
         result.append(
             {
                 "model": model,
+                "agent": agent,
                 "n": len(items),
                 "n_verdict": len(verdicts),
                 "pass_rate": (passes / len(verdicts)) if verdicts else None,

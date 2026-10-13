@@ -7,7 +7,8 @@ import type { EvalCase } from "../api/types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Button, Card, EmptyState, Input, Page, PageHeader, SectionTitle, Select, td, th, Toolbar } from "../components/ui";
 import { cn } from "../lib/cn";
-import { formatCompact, formatCost, formatPercent } from "../lib/format";
+import { agentLabel, formatCompact, formatCost, formatPercent } from "../lib/format";
+import { groupProjectsByPath, projectFilters } from "../lib/projects";
 
 export function EvalsPage() {
   const queryClient = useQueryClient();
@@ -16,11 +17,11 @@ export function EvalsPage() {
   const projects = useQuery({ queryKey: ["projects", true], queryFn: () => api.projects(true) });
   const summary = useQuery({
     queryKey: ["evals", "summary", project],
-    queryFn: () => api.evalsSummary(project || undefined),
+    queryFn: () => api.evalsSummary(projectFilters(project)),
   });
   const cases = useQuery({
     queryKey: ["evals", "cases", project, verdict],
-    queryFn: () => api.cases({ project: project || undefined, verdict: verdict || undefined }),
+    queryFn: () => api.cases({ ...projectFilters(project), verdict: verdict || undefined }),
   });
 
   function refresh() {
@@ -36,9 +37,9 @@ export function EvalsPage() {
       <Toolbar>
         <Select className="w-52" aria-label="Project" value={project} onChange={(event) => setProject(event.target.value)}>
           <option value="">All projects</option>
-          {(projects.data?.projects ?? []).map((item) => (
-            <option key={item.project_id} value={item.project_id}>
-              {item.name}
+          {groupProjectsByPath(projects.data?.projects ?? []).map((group) => (
+            <option key={group.key} value={group.key} title={group.cwd || undefined}>
+              {group.name}
             </option>
           ))}
         </Select>
@@ -49,12 +50,12 @@ export function EvalsPage() {
           <option value="fail">Fail</option>
         </Select>
       </Toolbar>
-      <SectionTitle>By model</SectionTitle>
       <Card className="mb-8 overflow-x-auto">
         <table className="w-full min-w-[640px] text-[13px]">
           <thead className="bg-surface2/50">
             <tr>
               <th className={th}>Model</th>
+              <th className={th}>Agent</th>
               <th className={cn(th, "text-right")}>Cases</th>
               <th className={th}>Pass rate</th>
               <th className={cn(th, "text-right")}>Median cost</th>
@@ -63,8 +64,9 @@ export function EvalsPage() {
           </thead>
           <tbody className="divide-y divide-line">
             {groups.map((group) => (
-              <tr key={group.model} className="hover:bg-surface2/60">
+              <tr key={`${group.model}::${group.agent}`} className="hover:bg-surface2/60">
                 <td className={cn(td, "font-mono text-xs")}>{group.model}</td>
+                <td className={cn(td, "text-muted")}>{agentLabel(group.agent)}</td>
                 <td className={cn(td, "text-right tabular-nums")}>{group.n}</td>
                 <td className={td}>
                   <div className="flex items-center gap-3">
@@ -72,7 +74,6 @@ export function EvalsPage() {
                       <div className="h-full rounded-full bg-ok" style={{ width: `${Math.round((group.pass_rate ?? 0) * 100)}%` }} />
                     </div>
                     <span className="tabular-nums">{formatPercent(group.pass_rate)}</span>
-                    <span className="text-2xs text-subtle">({group.n_verdict} labeled)</span>
                   </div>
                 </td>
                 <td className={cn(td, "text-right tabular-nums")}>{formatCost(group.median_cost)}</td>

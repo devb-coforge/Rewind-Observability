@@ -220,6 +220,7 @@ export type EvalCase = {
 
 export type EvalGroup = {
   model: string;
+  agent: string;
   n: number;
   n_verdict: number;
   pass_rate: number | null;
@@ -228,6 +229,7 @@ export type EvalGroup = {
 };
 
 export type Filters = {
+  project_cwd?: string;
   agent?: string;
   project?: string;
   model?: string;
