@@ -315,5 +315,3 @@ function ChartCard({
     </Card>
   );
 }
-Codex
-3 sessio
