@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Project, Session } from "../api/types";
 import { SessionGroups } from "./SessionGroups";
 
@@ -72,19 +72,139 @@ describe("hide and restore", () => {
         <Harness />
       </MemoryRouter>,
     );
+    await user.click(screen.getByRole("button", { name: "Expand proj" }));
     expect(screen.getByText("Fix the parser")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Hide project" }));
+    await user.click(screen.getByRole("button", { name: "Hide proj" }));
     expect(screen.queryByText("Fix the parser")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Hid proj.");
 
     await user.click(screen.getByRole("button", { name: "Undo" }));
     expect(screen.getByText("Fix the parser")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Hide project" }));
+    await user.click(screen.getByRole("button", { name: "Hide proj" }));
     await user.click(screen.getByRole("checkbox", { name: "Show hidden projects" }));
     expect(screen.getByText("Fix the parser")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Restore project" }));
-    expect(screen.getByRole("button", { name: "Hide project" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Restore proj" }));
+    expect(screen.getByRole("button", { name: "Hide proj" })).toBeInTheDocument();
+  });
+});
+
+describe("project path grouping", () => {
+  function renderGroups(projects: Project[], includeHidden = false) {
+    const onSetHidden = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MemoryRouter>
+        <SessionGroups
+          projects={projects}
+          sessions={projects.map((item) => ({
+            ...session(), id: `${item.agent}:${item.project_id}`, agent: item.agent,
+            project_id: item.project_id, project_cwd: item.cwd, project_hidden: item.hidden,
+            title: `${item.agent} task`,
+          }))}
+          includeHidden={includeHidden}
+          onIncludeHidden={() => {}}
+          onSetHidden={onSetHidden}
+        />
+      </MemoryRouter>,
+    );
+    return onSetHidden;
+  }
+
+  it("groups three agents under one path and retains their session tables and hide controls", async () => {
+    const user = userEvent.setup();
+    const onSetHidden = renderGroups([
+      project,
+      { ...project, project_id: "p2", agent: "codex" },
+      { ...project, project_id: "p3", agent: "cursor" },
+    ]);
+    expect(screen.getByRole("button", { name: "Hide proj" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    expect(screen.getAllByText("/work/proj")).toHaveLength(1);
+    expect(screen.getByText("3 sessions")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "Expand proj" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByRole("button", { name: "Hide proj" }));
+    expect(onSetHidden).toHaveBeenCalledWith("p1", true);
+    expect(onSetHidden).toHaveBeenCalledWith("p3", true);
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    for (const projectId of ["p1", "p2", "p3"]) {
+      expect(onSetHidden).toHaveBeenCalledWith(projectId, false);
+    }
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByRole("table")).toHaveLength(3);
+    for (const agent of ["claude_code", "codex", "cursor"]) {
+      expect(screen.getByText(`${agent} task`)).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: "Hide project" })).not.toBeInTheDocument();
+    await user.click(toggle);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("keeps identical names at different paths and unknown paths separate", () => {
+    renderGroups([
+      project,
+      { ...project, project_id: "p2", cwd: "/other/proj" },
+      { ...project, project_id: "p3", cwd: null },
+      { ...project, project_id: "p4", cwd: null, agent: "cursor" },
+    ]);
+    expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(4);
+  });
+
+  it("excludes hidden agents and can show mixed visibility within a path", async () => {
+    const user = userEvent.setup();
+    const projects = [project, { ...project, project_id: "p2", agent: "codex", hidden: true }];
+    renderGroups(projects);
+    await user.click(screen.getByRole("button", { name: "Expand proj" }));
+    expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    expect(screen.queryByText("codex task")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+  });
+
+  it("restores a hidden project across all agents sharing a path", async () => {
+    const user = userEvent.setup();
+    const onSetHidden = renderGroups([{ ...project, hidden: true }, { ...project, project_id: "p2", agent: "codex", hidden: true }], true);
+    await user.click(screen.getByRole("button", { name: "Expand proj" }));
+    expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    expect(screen.getAllByRole("table")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Restore proj" }));
+    expect(onSetHidden).toHaveBeenCalledWith("p2", false);
+  });
+});
+
+describe("project rename", () => {
+  it("renames a collapsed project and allows cancellation", async () => {
+    const user = userEvent.setup();
+    const onRename = vi.fn().mockResolvedValue(undefined);
+    render(<MemoryRouter><SessionGroups projects={[project]} sessions={[session()]} includeHidden={false}
+      onIncludeHidden={() => {}} onSetHidden={async () => {}} onRename={onRename} /></MemoryRouter>);
+    expect(screen.getByRole("button", { name: "Rename proj" })).toHaveTextContent("");
+    await user.click(screen.getByRole("button", { name: "Rename proj" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    expect(input).toHaveFocus();
+    await user.clear(input);
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await user.type(input, "  Custom project  ");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(onRename).toHaveBeenCalledWith("p1", "Custom project");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand proj" })).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByRole("button", { name: "Rename proj" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onRename).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the editor open when saving fails", async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><SessionGroups projects={[project]} sessions={[session()]} includeHidden={false}
+      onIncludeHidden={() => {}} onSetHidden={async () => {}}
+      onRename={async () => { throw new Error("Rename failed"); }} /></MemoryRouter>);
+    await user.click(screen.getByRole("button", { name: "Rename proj" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByText("Rename failed")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Project name" })).toBeInTheDocument();
   });
 });

@@ -41,6 +41,10 @@ class HiddenBody(BaseModel):
     hidden: bool
 
 
+class ProjectNameBody(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
 class DismissalBody(BaseModel):
     project_id: str
     path_prefix: str
@@ -126,11 +130,24 @@ def patch_project(project_id: str, body: HiddenBody, request: Request) -> dict:
     return {"project_id": project_id, "hidden": body.hidden}
 
 
+@router.put("/projects/{project_id}/name")
+def rename_project(project_id: str, body: ProjectNameBody, request: Request) -> dict:
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Project name cannot be blank")
+    obs = state(request)
+    with obs.store.transaction():
+        if not obs.store.rename_project(project_id, name, now()):
+            raise HTTPException(status_code=404, detail="Project not found")
+    return {"project_id": project_id, "name": name}
+
+
 @router.get("/sessions")
 def list_sessions(
     request: Request,
     agent: str | None = None,
     project: str | None = None,
+    project_cwd: str | None = None,
     model: str | None = None,
     from_: str | None = Query(None, alias="from"),
     to: str | None = None,
@@ -145,6 +162,7 @@ def list_sessions(
         return obs.store.list_sessions(
             agent=agent,
             project=project,
+            project_cwd=project_cwd,
             model=model,
             start=bound_time(from_, end=False),
             end=bound_time(to, end=True),

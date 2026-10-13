@@ -43,10 +43,13 @@ class ObsState:
 def create_app(config: AppConfig | None = None, *, sender=None) -> FastAPI:
     settings = config or load_config()
     store = Store(settings.data_dir)
-    pricing = Pricing.load(settings.pricing_file)
+    pricing = Pricing.load(settings.pricing_file) if settings.pricing_file else Pricing.openrouter(settings.data_dir)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        from starlette.concurrency import run_in_threadpool
+
+        await run_in_threadpool(pricing.refresh)
         if settings.ingest_on_startup and settings.sources:
             try:
                 Ingestor(settings, store, pricing).run(full=False)

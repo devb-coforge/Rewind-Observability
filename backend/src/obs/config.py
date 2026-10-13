@@ -129,7 +129,7 @@ def load_config() -> AppConfig:
         sources=[SourceConfig.model_validate(item) for item in sources],
         cursor_user_data_dir=os.environ.get("OBS_CURSOR_USER_DATA_DIR") or data.get("cursor_user_data_dir"),
         data_dir=Path(data_dir),
-        pricing_file=Path(pricing) if pricing else default_pricing_file(),
+        pricing_file=Path(pricing) if pricing else None,
         static_dir=default_static_dir(),
         otel=OtelConfig.model_validate(otel),
         boundary=BoundaryConfig.model_validate(boundary),

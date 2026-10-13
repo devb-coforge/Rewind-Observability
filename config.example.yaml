@@ -8,7 +8,8 @@ sources:
 # cursor_user_data_dir: /sources/cursor/user-data
 
 data_dir: /data
-pricing_file: /app/pricing.yaml
+# Optional manual override; default pricing comes from OpenRouter's cached catalog.
+# pricing_file: /app/pricing.yaml
 
 otel:
   endpoint: ""            # empty disables export

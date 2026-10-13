@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import { SessionGroups } from "../components/SessionGroups";
 import { AgentOptions, Button, ErrorText, Input, Loading, Page, PageHeader, Select, Toolbar } from "../components/ui";
-import { agentLabel } from "../lib/format";
+import { groupProjectsByPath, projectGroupKey } from "../lib/projects";
 
 export function SessionsPage() {
   const queryClient = useQueryClient();
@@ -17,7 +17,12 @@ export function SessionsPage() {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("started_at");
 
-  const filters = { agent, project, model, from, to, q, sort, include_hidden: includeHidden };
+  const filters = {
+    agent,
+    project: project.startsWith("id:") ? project.slice(3) : "",
+    project_cwd: project.startsWith("path:") ? project.slice(5) : "",
+    model, from, to, q, sort, include_hidden: includeHidden,
+  };
   const projects = useQuery({
     queryKey: ["projects", includeHidden],
     queryFn: () => api.projects(includeHidden),
@@ -38,7 +43,7 @@ export function SessionsPage() {
         title="Sessions"
         description={
           sessions.isSuccess
-            ? `${rows.length}${sessions.hasNextPage ? "+" : ""} sessions across ${new Set(rows.map((row) => row.project_id)).size} projects`
+            ? `${rows.length}${sessions.hasNextPage ? "+" : ""} sessions across ${new Set(rows.map((row) => projectGroupKey(row.project_group_cwd || row.project_cwd, row.project_id))).size} projects`
             : "Agent sessions grouped by project"
         }
       />
@@ -56,9 +61,9 @@ export function SessionsPage() {
         </Select>
         <Select className="w-48" value={project} onChange={(event) => setProject(event.target.value)} aria-label="Project">
           <option value="">All projects</option>
-          {(projects.data?.projects ?? []).map((item) => (
-            <option key={item.project_id} value={item.project_id}>
-              {item.name} ({agentLabel(item.agent)})
+          {groupProjectsByPath(projects.data?.projects ?? []).map((group) => (
+            <option key={group.key} value={group.key} title={group.cwd || undefined}>
+              {group.name}
             </option>
           ))}
         </Select>
@@ -91,6 +96,11 @@ export function SessionsPage() {
           sessions={rows}
           includeHidden={includeHidden}
           onIncludeHidden={setIncludeHidden}
+          onRename={async (projectId, name) => {
+            await api.renameProject(projectId, name);
+            await queryClient.invalidateQueries({ queryKey: ["projects"] });
+            await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+          }}
           onSetHidden={async (projectId, hidden) => {
             await api.setHidden(projectId, hidden);
             await queryClient.invalidateQueries({ queryKey: ["projects"] });

@@ -71,7 +71,9 @@ Conversation names and recorded creation dates are imported from the databases; 
 |---|---|
 | Mounted transcript folders | Source of truth. Never written. |
 | `/data/index.db` | Sessions, events, search. Safe to delete; a rescan rebuilds it. |
-| `/data/user.db` | Session notes, hidden projects, path allows, eval cases. |
+| `/data/user.db` | Session notes, custom project names, hidden projects, path allows, eval cases. |
+
+Use the pencil on a project header in Sessions to change its display name. The name applies to every agent sharing that recorded path. Cursor workspaces without a recorded path join a project when their encoded workspace folder matches exactly one known path; unmatched or ambiguous workspaces remain separate. Renames update `sessions.project_name` in `index.db` and are preserved in `user.db` across rescans and full rebuilds. Renaming does not change paths. The trash icon hides the project's agent entries, with Undo available.
 
 Back up the volume, including `user.db`:
 
@@ -84,7 +86,13 @@ The volume name is `<compose-project>_obs-data`. `docker volume ls` shows the ex
 
 ## Pricing
 
-`pricing.yaml` is USD per million tokens. A model matches the longest key it equals or continues with `-`. Models with no entry show as unknown cost. Point `OBS_PRICING_FILE` at your own table to override it.
+By default, prices come from OpenRouter's public `https://openrouter.ai/api/v1/models` catalog. No API key is required. The catalog is cached in `openrouter-pricing.json` in the data directory for 24 hours, and refreshed on startup or rescan when stale. Charts read stored estimates without calling OpenRouter. A failed refresh keeps the last successful cache; failures without a cache leave costs unknown and are retried on a later rescan (at most once every five minutes).
+
+Provider prefixes and Claude decimal version names are normalized (`gpt-6.1-sol` → `openai/gpt-6.1-sol`, `claude-sonnet-5-5` → `anthropic/claude-sonnet-5.5`). Unknown models stay unknown. Cache read/write rates and catalog prompt-length pricing tiers are applied where recorded token usage permits. Codex cached input is included in its input count and is charged once. Estimates use current catalog rates, not historical billing rates, and exclude non-token charges such as web search and per-request fees.
+
+Rescans recalculate existing sessions when the pricing table changes, even if transcripts have not changed. Frozen benchmark cases keep their original estimates. Only the public catalog is requested; no transcript content is sent to OpenRouter.
+
+For a manual/offline override, set `OBS_PRICING_FILE` (or `pricing_file` in config) to your own YAML table, such as `pricing.yaml`. That table uses USD per million tokens and longest-prefix matching. It replaces OpenRouter pricing.
 
 ## OpenTelemetry
 

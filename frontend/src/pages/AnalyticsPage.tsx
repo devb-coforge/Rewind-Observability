@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState, type ReactElement } from "react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api/client";
 import { AgentIcon, hasAgentIcon } from "../components/AgentIcon";
 import { AgentOptions, Card, Checkbox, Input, Page, PageHeader, Select, Toolbar } from "../components/ui";
@@ -101,7 +101,7 @@ export function AnalyticsPage() {
         <Kpi
           label="Estimated cost"
           value={formatCost(data?.est_cost_usd)}
-          hint={data?.cost_coverage === "partial" ? "Partial — some models have no pricing" : undefined}
+          hint={data?.cost_coverage === "none" ? "No matching pricing or recorded token usage" : undefined}
         />
         <Kpi
           label="Median duration"
@@ -130,7 +130,7 @@ export function AnalyticsPage() {
         </ChartCard>
         <ChartCard
           title="Estimated cost by day"
-          empty={cost.isSuccess && !costChart.some((point) => point.cost) && "No priced usage in this range"}
+          empty={cost.isSuccess && !costChart.some((point) => point.cost != null) && "No matching pricing or recorded token usage in this range"}
         >
           <AreaChart data={costChart} margin={chartMargin}>
             <defs>
@@ -163,19 +163,9 @@ export function AnalyticsPage() {
         <ChartCard
           title="Tool use"
           empty={tools.isSuccess && toolChart.length === 0 && "No tool calls in this range"}
-          legend={[
-            { label: "Calls", color: "#8b97ff" },
-            { label: "Errors", color: "#f47272" },
-          ]}
+          responsive={false}
         >
-          <BarChart data={toolChart} margin={chartMargin} barGap={2}>
-            <CartesianGrid {...grid} />
-            <XAxis dataKey="tool_name" {...axis} interval={0} tickFormatter={(value: string) => (value.length > 10 ? `${value.slice(0, 9)}…` : value)} />
-            <YAxis {...axis} allowDecimals={false} width={36} />
-            <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgb(255 255 255 / 0.03)" }} />
-            <Bar dataKey="calls" name="Calls" fill="#8b97ff" radius={[3, 3, 0, 0]} maxBarSize={22} />
-            <Bar dataKey="errors" name="Errors" fill="#f47272" radius={[3, 3, 0, 0]} maxBarSize={22} />
-          </BarChart>
+          <ToolUsageTable tools={toolChart} />
         </ChartCard>
       </div>
     </Page>
@@ -183,6 +173,35 @@ export function AnalyticsPage() {
 }
 
 const chartMargin = { top: 8, right: 8, bottom: 0, left: -4 };
+
+function ToolUsageTable({ tools }: { tools: { tool_name: string; calls: number; errors: number }[] }) {
+  const maxCalls = Math.max(1, ...tools.map((tool) => tool.calls));
+  return (
+    <table className="w-full table-fixed text-xs">
+      <thead>
+        <tr className="text-muted">
+          <th scope="col" className="pb-2 text-left font-medium">Tool</th>
+          <th scope="col" className="w-20 pb-2 text-right font-medium text-accent">Calls</th>
+          <th scope="col" className="w-16 pb-2 text-right font-medium text-danger">Errors</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-line">
+        {tools.map((tool) => (
+          <tr key={tool.tool_name}>
+            <th scope="row" className="py-2 pr-3 text-left font-normal">
+              <div className="[overflow-wrap:anywhere] text-ink">{tool.tool_name}</div>
+              <div aria-hidden="true" className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface3">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${(tool.calls / maxCalls) * 100}%` }} />
+              </div>
+            </th>
+            <td className="py-2 text-right tabular-nums text-ink">{tool.calls.toLocaleString()}</td>
+            <td className={`py-2 text-right tabular-nums ${tool.errors > 0 ? "text-danger" : "text-muted"}`}>{tool.errors.toLocaleString()}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 function shortDate(value: string): string {
   const date = new Date(`${value}T00:00:00`);
@@ -258,11 +277,13 @@ function ChartCard({
   title,
   legend,
   empty,
+  responsive = true,
   children,
 }: {
   title: string;
   legend?: { label: string; color: string; agent?: string }[];
   empty?: string | false;
+  responsive?: boolean;
   children: ReactElement;
 }) {
   return (
@@ -286,11 +307,11 @@ function ChartCard({
       </div>
       {empty ? (
         <div className="grid h-[232px] place-items-center rounded-md border border-dashed border-line text-xs text-subtle">{empty}</div>
-      ) : (
+      ) : responsive ? (
         <ResponsiveContainer width="100%" height={232}>
           {children}
         </ResponsiveContainer>
-      )}
+      ) : children}
     </Card>
   );
 }
