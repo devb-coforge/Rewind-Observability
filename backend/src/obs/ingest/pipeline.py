@@ -13,6 +13,16 @@ from obs.ingest.scanner import path_under_source, resolve_sources, source_root
 log = logging.getLogger("obs.ingest")
 
 
+class SourceAccessError(PermissionError):
+    def __init__(self, root: Path):
+        super().__init__(
+            f"Cannot read transcript source {root}. Check source permissions; "
+            "with Docker, set PUID and PGID to your host user's UID and GID "
+            "(id -u and id -g), then recreate the container. "
+            "The index was not changed."
+        )
+
+
 class Ingestor:
     def __init__(self, config: AppConfig, store: Store, pricing: Pricing):
         self.config = config
@@ -33,14 +43,22 @@ class Ingestor:
                 self.store.reset_index()
             for source, adapter in resolve_sources(self.config.sources):
                 root = source_root(source)
-                if adapter is None or not root.exists():
+                if adapter is None:
                     continue
+                try:
+                    if not root.exists():
+                        continue
+                    paths = adapter.discover(root)
+                except PermissionError as exc:
+                    raise SourceAccessError(root) from exc
                 discovered: list[Path] = []
-                for path in adapter.discover(root):
+                for path in paths:
                     discovered.append(path)
                     stats["files_seen"] += 1
                     try:
                         added = self._ingest_file(path, adapter, affected)
+                    except PermissionError as exc:
+                        raise SourceAccessError(root) from exc
                     except Exception:
                         log.exception("failed to parse %s", path)
                         continue

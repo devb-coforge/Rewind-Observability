@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from obs.benchmark import delete_case, freeze_case, get_case, list_cases, summarize, update_case
 from obs.analytics import queries
 from obs.export_run import export_pending
-from obs.ingest.pipeline import Ingestor
+from obs.ingest.pipeline import Ingestor, SourceAccessError
 from obs.ingest.scanner import path_under_source, resolve_agent, resolve_sources, source_root
 
 router = APIRouter(prefix="/api")
@@ -101,7 +101,10 @@ def sources(request: Request) -> dict:
 @router.post("/reindex")
 def reindex(request: Request, full: bool = False) -> dict:
     obs = state(request)
-    stats = Ingestor(obs.config, obs.store, obs.pricing).run(full=full)
+    try:
+        stats = Ingestor(obs.config, obs.store, obs.pricing).run(full=full)
+    except SourceAccessError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     export = export_pending(obs.config, obs.store, sender=obs.sender)
     stats["export"] = export
     return stats

@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from obs.adapters.detect import infer_agent_from_path
+from obs.adapters.discovery import discover_files
 from obs.adapters.lineio import complete_lines, int_or_none, loads_obj, parse_ts, stringify
 from obs.models import ParsedEvent, ParseResult, Usage
 
@@ -26,7 +27,7 @@ class CodexAdapter:
         if not root.exists():
             return []
         base = root / "sessions" if (root / "sessions").is_dir() else root
-        return sorted(path for path in base.rglob("rollout-*.jsonl") if path.is_file())
+        return discover_files(base, "rollout-*.jsonl")
 
     def session_titles(self, root: Path) -> dict[str, str] | None:
         """Read Codex's conversation names without opening its internal state database.

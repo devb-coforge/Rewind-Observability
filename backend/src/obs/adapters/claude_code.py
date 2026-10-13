@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from obs.adapters.detect import infer_agent_from_path
+from obs.adapters.discovery import discover_files
 from obs.adapters.lineio import complete_lines, int_or_none, loads_obj, parse_ts, stringify
 from obs.models import ParsedEvent, ParseResult, Usage
 
@@ -30,7 +31,7 @@ class ClaudeCodeAdapter:
         if not root.exists():
             return []
         base = root / "projects" if (root / "projects").is_dir() else root
-        return sorted(path for path in base.rglob("*.jsonl") if path.is_file())
+        return discover_files(base, "*.jsonl")
 
     def native_id_from_path(self, path: Path) -> str | None:
         if path.parent.name == "subagents":
