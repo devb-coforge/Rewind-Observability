@@ -107,6 +107,26 @@ export type SearchHit = {
   project_id: string;
 };
 
+export type FailureHit = {
+  event_id: string;
+  session_id: string;
+  seq: number;
+  ts: string | null;
+  tool_name: string;
+  tool_input: string | null;
+  error_preview: string | null;
+  session_title: string | null;
+  project_name: string | null;
+  agent: string;
+  project_id: string;
+};
+
+export type FailureSearch = {
+  total: number;
+  by_tool: { tool_name: string; count: number }[];
+  hits: FailureHit[];
+};
+
 export type Summary = {
   sessions: number;
   tokens_in: number | null;

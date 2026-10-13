@@ -78,6 +78,11 @@ CREATE TABLE IF NOT EXISTS event_blobs (
   tool_output TEXT
 );
 
+CREATE TABLE IF NOT EXISTS event_raw (
+  event_id TEXT PRIMARY KEY,
+  content TEXT NOT NULL
+);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
   event_id UNINDEXED,
   session_id UNINDEXED,

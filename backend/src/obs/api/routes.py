@@ -243,6 +243,12 @@ def event_raw(event_id: str, request: Request) -> PlainTextResponse:
         raise HTTPException(404, "source file is not in a configured root")
     if not path.is_file():
         raise HTTPException(404, "source file is missing")
+    with obs.store.transaction():
+        saved = obs.store.index.execute(
+            "SELECT content FROM event_raw WHERE event_id = ?", (event_id,)
+        ).fetchone()
+    if saved is not None:
+        return PlainTextResponse(saved["content"])
     data = path.read_bytes()
     start = int(event["raw_offset"])
     length = int(event["raw_length"])
@@ -270,6 +276,29 @@ def search(
                 limit=limit,
             )
         }
+
+
+@router.get("/search/failures")
+def search_failures(
+    request: Request,
+    agent: str | None = None,
+    project: str | None = None,
+    tool: str | None = None,
+    q: str | None = None,
+    include_hidden: bool = False,
+    limit: int = 50,
+) -> dict:
+    obs = state(request)
+    with obs.store.transaction():
+        return queries.failed_tools(
+            obs.store,
+            agent=agent,
+            project=project,
+            tool=tool,
+            q=q,
+            include_hidden=include_hidden,
+            limit=limit,
+        )
 
 
 @router.get("/analytics/summary")

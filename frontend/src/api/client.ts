@@ -6,6 +6,7 @@ import type {
   Note,
   ObsEvent,
   Project,
+  FailureSearch,
   SearchHit,
   Session,
   SessionDetail,
@@ -90,6 +91,8 @@ export const api = {
     request<{ event_id: string; output: string | null }>(`/api/events/${encodeURIComponent(id)}/output`),
   eventRaw: (id: string) => request<string>(`/api/events/${encodeURIComponent(id)}/raw`),
   search: (filters: Filters & { q: string }) => request<{ hits: SearchHit[] }>(`/api/search${query(filters)}`),
+  searchFailures: (filters: Filters & { tool?: string; q?: string }) =>
+    request<FailureSearch>(`/api/search/failures${query(filters)}`),
   summary: (filters: Filters) => request<Summary>(`/api/analytics/summary${query(filters)}`),
   timeseries: (filters: Filters & { metric: string; bucket?: string; group_by?: string }) =>
     request<{ metric: string; bucket: string; group_by: string | null; points: SeriesPoint[] }>(

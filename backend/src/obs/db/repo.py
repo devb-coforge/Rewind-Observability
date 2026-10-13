@@ -79,6 +79,7 @@ class Store:
         self.user.close()
 
     def reset_index(self) -> None:
+        self.index.execute("DELETE FROM event_raw")
         self.index.execute("DELETE FROM events_fts")
         self.index.execute("DELETE FROM event_blobs")
         self.index.execute("DELETE FROM events")
@@ -149,6 +150,7 @@ class Store:
         for row in rows:
             self.index.execute("DELETE FROM events_fts WHERE rowid = ?", (row["rowid"],))
             self.index.execute("DELETE FROM event_blobs WHERE event_id = ?", (row["id"],))
+            self.index.execute("DELETE FROM event_raw WHERE event_id = ?", (row["id"],))
             sessions.append(row["session_id"])
         self.index.execute("DELETE FROM events WHERE raw_path = ?", (path,))
         return sessions

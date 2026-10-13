@@ -83,6 +83,16 @@ class CursorAdapter:
                                 "name": name, "createdAt": created_at,
                                 "modelConfig": {"modelName": selected_model},
                             })
+                        for key, value in db.execute("""
+                            SELECT key, value FROM cursorDiskKV
+                            WHERE key LIKE 'bubbleId:%' AND json_valid(value)
+                              AND json_type(value, '$.toolFormerData') = 'object'
+                        """):
+                            parts = key.split(":")
+                            if len(parts) == 3:
+                                metadata.setdefault(parts[1], {}).setdefault("tools", []).append({
+                                    "key": key, "database": str(path), "bubble": json.loads(value),
+                                })
                         for key, model in db.execute("""
                             SELECT key, json_extract(value, '$.modelInfo.modelName') FROM cursorDiskKV
                             WHERE key LIKE 'bubbleId:%' AND json_valid(value)

@@ -12,13 +12,13 @@ from obs.adapters.lineio import complete_lines, int_or_none, loads_obj, parse_ts
 from obs.models import ParsedEvent, ParseResult, Usage
 
 _TOOL_WRAP = re.compile(r"^text\(await tools\.([A-Za-z0-9_]+)\(", re.DOTALL)
-_EXIT_CODE = re.compile(r"Exit code:\s*(\d+)")
+_EXIT_CODE = re.compile(r"^(?:Exit code:|Process exited with code)\s*(-?\d+)\s*$", re.MULTILINE)
 log = logging.getLogger(__name__)
 
 
 class CodexAdapter:
     name = "codex"
-    version = 1
+    version = 2
 
     def detect(self, root: Path) -> bool:
         return infer_agent_from_path(root) == "codex"
@@ -303,7 +303,7 @@ class CodexAdapter:
         if ptype in ("function_call_output", "custom_tool_call_output"):
             output = stringify(payload.get("output"))
             call_id = payload.get("call_id") if isinstance(payload.get("call_id"), str) else None
-            is_error = bool(payload.get("is_error")) or _output_failed(output)
+            is_error = bool(payload.get("is_error")) or _result_failed(payload.get("output")) or _output_failed(output)
             result.events.append(
                 ParsedEvent(
                     native_id=item_id,
@@ -476,8 +476,48 @@ def _reasoning_text(summary) -> str | None:
 
 
 def _output_failed(output: str) -> bool:
-    match = _EXIT_CODE.search(output or "")
-    return bool(match and match.group(1) != "0")
+    if (output or "").startswith(("Script failed\n", "Script error:", "Error parsing function call:", "Error executing tool")):
+        return True
+    if any(int(match.group(1)) != 0 for match in _EXIT_CODE.finditer(output or "")):
+        return True
+    # Exec envelopes contain one JSON result per line, including settled
+    # promise values and MCP content blocks. Don't scan command output fields:
+    # they may contain source code or transcripts mentioning error flags.
+    for line in (output or "").splitlines():
+        try:
+            value = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if _result_failed(value):
+            return True
+    return False
+
+
+def _result_failed(value) -> bool:
+    if isinstance(value, list):
+        return any(_result_failed(item) for item in value)
+    if not isinstance(value, dict):
+        return False
+    if value.get("is_error") is True or value.get("isError") is True:
+        return True
+    for key in ("exit_code", "exitCode"):
+        code = value.get(key)
+        if isinstance(code, int) and not isinstance(code, bool) and code != 0:
+            return True
+    if value.get("status") == "rejected":
+        return True
+    if _result_failed(value.get("value")) or _result_failed(value.get("structuredContent")):
+        return True
+    metadata = value.get("metadata")
+    if isinstance(metadata, dict) and _result_failed(metadata):
+        return True
+    content = value.get("content")
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                if _output_failed(block.get("text") or ""):
+                    return True
+    return False
 
 
 def _git_branch(payload: dict) -> str | None:

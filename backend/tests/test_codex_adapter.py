@@ -1,7 +1,9 @@
 from pathlib import Path
 import json
+import pytest
 
 from obs.adapters.codex import CodexAdapter, interpret_tool
+from obs.adapters.codex import _output_failed
 
 FIXTURE = (
     Path(__file__).parent / "fixtures" / "codex" / "sessions" / "2026" / "02" / "01" / "rollout-2026-02-01T12-00-00-codex-sess-1.jsonl"
@@ -63,3 +65,40 @@ def test_session_names_use_latest_valid_entry_and_ignore_partial_lines(tmp_path)
 
 def test_missing_session_index_is_supported(tmp_path):
     assert CodexAdapter().session_titles(tmp_path) == {}
+
+
+@pytest.mark.parametrize("output,failed", [
+    ('Exit code: 1\nOutput:\nfailed', True),
+    ('Process exited with code -9\n', True),
+    ('Script completed\nOutput:\n{"exit_code":0}\n{"exit_code":7}', True),
+    ('{"status":"fulfilled","value":{"exit_code":1}}', True),
+    ('{"status":"rejected","reason":"failed"}', True),
+    ('{"isError":true,"content":[]}', True),
+    ('{"content":[{"type":"text","text":"{\\"exit_code\\":2}"}]}', True),
+    ('{"exit_code":null,"session_id":123}', False),
+    ('{"exit_code":0,"output":"{\\"exit_code\\":1}"}', False),
+    ('{"exit_code":0,"output":"Exit code: 1"}', False),
+    ('Example: Exit code: 1', False),
+    ('Script failed\nOutput:\n{"exit_code":0}\nScript error:\ninvalid patch', True),
+    ('{"exit_code":0,"output":"Script failed\\n"}', False),
+])
+def test_structured_tool_failure_detection(output, failed):
+    assert _output_failed(output) is failed
+
+
+def test_codex_imports_wrapped_nonzero_exit_code(tmp_path):
+    path = tmp_path / "rollout-test.jsonl"
+    path.write_text(json.dumps({"type": "response_item", "payload": {
+        "type": "custom_tool_call_output", "call_id": "call-1",
+        "output": 'Script completed\nOutput:\n{"exit_code":254,"output":"npm failed"}',
+    }}) + "\n")
+    assert CodexAdapter().parse(path, 0).events[0].is_error
+
+
+def test_codex_preserves_structured_mcp_error_flag(tmp_path):
+    path = tmp_path / "rollout-mcp.jsonl"
+    path.write_text(json.dumps({"type": "response_item", "payload": {
+        "type": "function_call_output", "call_id": "mcp-1",
+        "output": {"isError": True, "content": [{"type": "text", "text": "denied"}]},
+    }}) + "\n")
+    assert CodexAdapter().parse(path, 0).events[0].is_error

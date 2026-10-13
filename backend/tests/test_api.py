@@ -160,3 +160,15 @@ def test_search_and_sources(client):
     assert sources["last_indexed_at"]
     assert {item["agent"] for item in sources["sources"]} == {"claude_code", "codex"}
     assert all(item["files"] >= 1 for item in sources["sources"])
+
+
+def test_search_failures(client):
+    body = client.get("/api/search/failures").json()
+    assert body["total"] >= 1
+    assert body["hits"]
+    assert sum(item["count"] for item in body["by_tool"]) == body["total"]
+    first = body["hits"][0]
+    assert first["tool_name"] and first["session_id"]
+    narrowed = client.get("/api/search/failures", params={"tool": first["tool_name"]}).json()
+    assert narrowed["hits"] and all(h["tool_name"] == first["tool_name"] for h in narrowed["hits"])
+    assert client.get("/api/search/failures", params={"q": "zzz-no-such-text"}).json()["hits"] == []

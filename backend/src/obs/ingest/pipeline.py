@@ -86,6 +86,11 @@ class Ingestor:
                         for session in sessions:
                             if not path_under_source(session["source_path"], source):
                                 continue
+                            if metadata is not None:
+                                from obs.ingest.cursor_tools import sync_tools
+
+                                if sync_tools(self.store, session, metadata.get(session["native_id"], {}).get("tools", [])):
+                                    affected.add(session["id"])
                             title = titles.get(session["native_id"])
                             created_at = (metadata or {}).get(session["native_id"], {}).get("started_at")
                             if metadata is not None:

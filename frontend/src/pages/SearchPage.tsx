@@ -1,12 +1,12 @@
-import { ArrowUpRight, Search, SearchX } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { ArrowUpRight, CircleAlert, Search, SearchX } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { SearchHit } from "../api/types";
+import type { FailureSearch, SearchHit } from "../api/types";
 import { AgentBadge, AgentOptions, Badge, Button, EmptyState, ErrorText, Input, Page, PageHeader, Select } from "../components/ui";
 import { formatTime } from "../lib/format";
 
-export function SearchPage() {
+function TextSearch() {
   const [q, setQ] = useState("");
   const [agent, setAgent] = useState("");
   const [hits, setHits] = useState<SearchHit[] | null>(null);
@@ -28,8 +28,7 @@ export function SearchPage() {
   }
 
   return (
-    <Page className="max-w-4xl">
-      <PageHeader title="Search" description="Full-text search across messages, tool calls, and outputs." />
+    <>
       <form className="mb-6 flex flex-wrap gap-2" onSubmit={(event) => void onSubmit(event)}>
         <Input
           className="min-w-64 flex-1 [&_input]:h-9"
@@ -81,6 +80,170 @@ export function SearchPage() {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+function inputPreview(raw: string | null): string {
+  if (!raw) return "";
+  try {
+    const input = JSON.parse(raw) as Record<string, unknown>;
+    for (const key of ["command", "cmd", "file_path", "path", "pattern", "url", "query"]) {
+      if (typeof input[key] === "string") return input[key] as string;
+    }
+    const first = Object.values(input).find((value) => typeof value === "string");
+    return typeof first === "string" ? first : raw;
+  } catch {
+    return raw;
+  }
+}
+
+function FailureSearchView() {
+  const [agent, setAgent] = useState("");
+  const [tool, setTool] = useState("");
+  const [q, setQ] = useState("");
+  const [data, setData] = useState<FailureSearch | null>(null);
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+
+  async function load(next: { agent: string; tool: string; q: string }) {
+    setPending(true);
+    setError("");
+    try {
+      setData(await api.searchFailures(next));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Search failed");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  useEffect(() => {
+    void load({ agent, tool, q: "" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    void load({ agent, tool, q });
+  }
+
+  function pickTool(next: string) {
+    setTool(next);
+    void load({ agent, tool: next, q });
+  }
+
+  return (
+    <>
+      <form className="mb-4 flex flex-wrap gap-2" onSubmit={onSubmit}>
+        <Input
+          className="min-w-64 flex-1 [&_input]:h-9"
+          icon={<Search className="size-4" />}
+          value={q}
+          onChange={(event) => setQ(event.target.value)}
+          placeholder="Filter by command or error text"
+          aria-label="Filter failed tool calls"
+        />
+        <Select
+          className="w-36 [&_select]:h-9"
+          aria-label="Agent"
+          value={agent}
+          onChange={(event) => {
+            setAgent(event.target.value);
+            void load({ agent: event.target.value, tool, q });
+          }}
+        >
+          <AgentOptions />
+        </Select>
+        <Button type="submit" variant="primary" className="h-9 px-4" disabled={pending}>
+          {pending ? "Loading…" : "Apply"}
+        </Button>
+      </form>
+      {error ? <ErrorText>{error}</ErrorText> : null}
+      {data && data.by_tool.length > 0 ? (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5" aria-label="Failures by tool">
+          <button
+            type="button"
+            onClick={() => pickTool("")}
+            className={`rounded-full border px-2.5 py-1 text-2xs ${tool === "" ? "border-accent text-accent" : "border-line text-muted hover:text-ink"}`}
+          >
+            All tools · {data.total}
+          </button>
+          {data.by_tool.map((item) => (
+            <button
+              key={item.tool_name}
+              type="button"
+              onClick={() => pickTool(item.tool_name)}
+              className={`rounded-full border px-2.5 py-1 text-2xs ${tool === item.tool_name ? "border-accent text-accent" : "border-line text-muted hover:text-ink"}`}
+            >
+              {item.tool_name} · {item.count}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {data && data.hits.length === 0 ? (
+        <EmptyState icon={<SearchX className="size-6" />} title="No failed tool calls." description="Nothing matches these filters." />
+      ) : null}
+      <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface shadow-card empty:hidden">
+        {(data?.hits ?? []).map((hit) => (
+          <li key={hit.event_id}>
+            <Link
+              className="group block px-4 py-3.5 transition-colors hover:bg-surface2/60"
+              to={`/sessions/${encodeURIComponent(hit.session_id)}?event=${encodeURIComponent(hit.event_id)}`}
+            >
+              <div className="flex items-center gap-2">
+                <CircleAlert aria-hidden="true" className="size-3.5 shrink-0 text-red-400" />
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink group-hover:text-accent">
+                  {hit.session_title || hit.session_id}
+                </span>
+                <ArrowUpRight aria-hidden="true" className="size-3.5 shrink-0 text-subtle opacity-0 transition-opacity group-hover:opacity-100" />
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-2xs text-subtle">
+                <AgentBadge agent={hit.agent} />
+                <Badge>{hit.tool_name}</Badge>
+                <span>{hit.project_name || "(unknown)"}</span>
+                <span aria-hidden="true">·</span>
+                <span className="tabular-nums">{formatTime(hit.ts)}</span>
+              </div>
+              {inputPreview(hit.tool_input) ? (
+                <p className="mt-2 truncate font-mono text-2xs text-muted">{inputPreview(hit.tool_input)}</p>
+              ) : null}
+              {hit.error_preview ? (
+                <p className="mt-1 line-clamp-3 text-[13px] leading-relaxed text-muted">{hit.error_preview}</p>
+              ) : null}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+export function SearchPage() {
+  const [mode, setMode] = useState<"text" | "failures">("text");
+  return (
+    <Page className="max-w-4xl">
+      <PageHeader title="Search" />
+      <div className="mb-4 inline-flex rounded-md border border-line p-0.5 text-[13px]" role="tablist" aria-label="Search mode">
+        {(
+          [
+            ["text", "Text"],
+            ["failures", "Failed tool calls"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={mode === value}
+            onClick={() => setMode(value)}
+            className={`rounded px-3 py-1 ${mode === value ? "bg-surface2 text-ink" : "text-muted hover:text-ink"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === "text" ? <TextSearch /> : <FailureSearchView />}
     </Page>
   );
 }

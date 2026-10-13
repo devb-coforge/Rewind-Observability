@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from obs.analytics.pricing import Pricing
-from obs.db.repo import Store
+from obs.db.repo import Store, _escape_like
 
 _FTS_TERM = re.compile(r"[\w./:+-]{2,}")
 
@@ -53,6 +53,68 @@ def search(store: Store, *, q: str, agent: str | None, project: str | None, incl
         }
         for row in rows
     ]
+
+
+def failed_tools(
+    store: Store,
+    *,
+    agent: str | None,
+    project: str | None,
+    tool: str | None,
+    q: str | None,
+    include_hidden: bool,
+    limit: int,
+) -> dict:
+    where, params = store._session_filters(
+        {"agent": agent, "project": project, "include_hidden": include_hidden}
+    )
+    base = f"""
+        FROM events r
+        JOIN sessions s ON s.id = r.session_id
+        LEFT JOIN events c
+          ON c.session_id = r.session_id
+         AND c.kind = 'tool_call'
+         AND c.tool_call_id = r.tool_call_id
+        WHERE r.kind = 'tool_result' AND r.is_error = 1 AND {where}
+    """
+    by_tool = [
+        {"tool_name": row["tool_name"], "count": row["n"]}
+        for row in store.index.execute(
+            f"SELECT COALESCE(c.tool_name, r.tool_name, 'unknown') AS tool_name, COUNT(*) AS n {base} "
+            "GROUP BY 1 ORDER BY n DESC",
+            params,
+        )
+    ]
+    extra = ""
+    extra_params: list = []
+    if tool:
+        extra += " AND COALESCE(c.tool_name, r.tool_name, 'unknown') = ?"
+        extra_params.append(tool)
+    if q:
+        like = f"%{_escape_like(q)}%"
+        extra += (
+            " AND (COALESCE(r.tool_output_preview, '') LIKE ? ESCAPE '\\'"
+            " OR COALESCE(c.tool_input_json, '') LIKE ? ESCAPE '\\')"
+        )
+        extra_params.extend([like, like])
+    rows = store.index.execute(
+        f"""
+        SELECT r.id AS event_id, r.session_id, r.seq, r.ts,
+               COALESCE(c.tool_name, r.tool_name, 'unknown') AS tool_name,
+               c.tool_input_json AS tool_input,
+               r.tool_output_preview AS error_preview,
+               s.title AS session_title, s.project_name, s.agent, s.project_id
+        {base} {extra}
+        ORDER BY COALESCE(r.ts, '') DESC
+        LIMIT ?
+        """,
+        [*params, *extra_params, min(limit, 100)],
+    )
+    return {
+        "by_tool": by_tool,
+        "total": sum(item["count"] for item in by_tool),
+        "hits": [dict(row) for row in rows],
+    }
 
 
 def summary(store: Store, filters: dict) -> dict:
@@ -166,17 +228,28 @@ def tools(store: Store, filters: dict) -> dict:
     where, params = store._session_filters(filters)
     rows = store.index.execute(
         f"""
-        SELECT c.tool_name AS tool_name,
-               COUNT(*) AS calls,
-               SUM(CASE WHEN r.is_error = 1 THEN 1 ELSE 0 END) AS errors
-        FROM events c
-        JOIN sessions s ON s.id = c.session_id
-        LEFT JOIN events r
-          ON r.session_id = c.session_id
-         AND r.kind = 'tool_result'
-         AND r.tool_call_id = c.tool_call_id
-        WHERE c.kind = 'tool_call' AND c.tool_name IS NOT NULL AND {where}
-        GROUP BY c.tool_name
+        WITH filtered AS (
+            SELECT e.* FROM events e JOIN sessions s ON s.id = e.session_id WHERE {where}
+        ), counts AS (
+            SELECT tool_name, COUNT(*) AS calls, 0 AS errors
+            FROM filtered WHERE kind = 'tool_call' AND tool_name IS NOT NULL
+            GROUP BY tool_name
+            UNION ALL
+            SELECT COALESCE((SELECT c.tool_name FROM filtered c
+                             WHERE c.kind = 'tool_call' AND c.session_id = r.session_id
+                               AND c.tool_call_id = r.tool_call_id LIMIT 1), r.tool_name),
+                   0, COUNT(*)
+            FROM filtered r WHERE r.kind = 'tool_result' AND r.is_error = 1
+            GROUP BY 1
+            UNION ALL
+            SELECT c.tool_name, 0, COUNT(*) FROM filtered c
+            WHERE c.kind = 'tool_call' AND c.is_error = 1 AND NOT EXISTS (
+                SELECT 1 FROM filtered r WHERE r.kind = 'tool_result'
+                  AND r.session_id = c.session_id AND r.tool_call_id = c.tool_call_id AND r.is_error = 1
+            ) GROUP BY c.tool_name
+        )
+        SELECT tool_name, SUM(calls) AS calls, SUM(errors) AS errors
+        FROM counts WHERE tool_name IS NOT NULL GROUP BY tool_name
         ORDER BY calls DESC
         """,
         params,

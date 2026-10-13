@@ -72,7 +72,7 @@ def build_spans(session: dict, events: list[dict], *, include_content: bool) -> 
     for event in events:
         if event["kind"] == "tool_result" and event.get("tool_call_id") in {e.get("tool_call_id") for e in events if e["kind"] == "tool_call"}:
             continue
-        if event["kind"] not in {"message", "thinking", "tool_call"}:
+        if event["kind"] not in {"message", "thinking", "tool_call", "tool_result"}:
             continue
         if event["role"] == "system":
             continue
@@ -80,9 +80,9 @@ def build_spans(session: dict, events: list[dict], *, include_content: bool) -> 
         status = "OK"
         end_ts = _ts(event.get("ts"))
         name = f"{event['role']} message" if event["kind"] == "message" else event["kind"]
-        if event["kind"] == "tool_call":
+        if event["kind"] in {"tool_call", "tool_result"}:
             name = f"tool {event.get('tool_name') or 'tool'}"
-            result = results.get(event.get("tool_call_id"))
+            result = event if event["kind"] == "tool_result" else results.get(event.get("tool_call_id"))
             if result is not None:
                 consumed.add(event.get("tool_call_id") or "")
                 end_ts = _ts(result.get("ts"))
