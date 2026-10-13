@@ -1,5 +1,8 @@
 backend/.venv
 backend/.pytest_cache
+**/.env
+**/.env.*
+!**/.env.example
 frontend/node_modules
 frontend/dist
 .git

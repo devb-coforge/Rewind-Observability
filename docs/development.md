@@ -9,7 +9,7 @@ cp .env.example .env   # edit paths and port if needed
 uv run obs
 ```
 
-`backend/.env` is loaded automatically. Defaults are `127.0.0.1:8080` (`OBS_HOST`, `OBS_PORT`). Docker sets `OBS_HOST=0.0.0.0` so the published port works.
+`backend/.env` is loaded automatically for local development. Defaults are `127.0.0.1:8080` (`OBS_HOST`, `OBS_PORT`). Docker excludes local `.env` files and sets `OBS_HOST=0.0.0.0` and `OBS_PORT=8080` to match the published port. Open the Docker app at http://127.0.0.1:8080; `0.0.0.0` is the server's listening address.
 
 Frontend:
 

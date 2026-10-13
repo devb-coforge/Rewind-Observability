@@ -7,9 +7,11 @@ services:
       - ${HOME}/.claude:/sources/claude:ro
       - ${HOME}/.codex:/sources/codex:ro
       - ${HOME}/.cursor:/sources/cursor:ro
+      - "${HOME}/Library/Application Support/Cursor/User:/sources/cursor-user-data:ro"
       - obs-data:/data
     environment:
       OBS_SOURCES: /sources/claude,/sources/codex,/sources/cursor
+      OBS_CURSOR_USER_DATA_DIR: /sources/cursor-user-data
       OBS_DATA_DIR: /data
       PUID: ${PUID:-502}
       PGID: ${PGID:-20}
