@@ -184,6 +184,16 @@ def get_session(session_id: str, request: Request) -> dict:
     return detail
 
 
+@router.patch("/sessions/{session_id}")
+def patch_session(session_id: str, body: HiddenBody, request: Request) -> dict:
+    obs = state(request)
+    with obs.store.transaction():
+        if obs.store.get_session(session_id) is None:
+            raise HTTPException(404, "session not found")
+        obs.store.set_session_hidden(session_id, body.hidden, now())
+    return {"session_id": session_id, "hidden": body.hidden}
+
+
 @router.get("/sessions/{session_id}/note")
 def get_note(session_id: str, request: Request) -> dict:
     obs = state(request)

@@ -64,7 +64,7 @@ export function AnalyticsPage() {
 
   return (
     <Page>
-      <PageHeader title="Analytics" description="Usage, cost, and tool activity across indexed sessions. Costs are estimates." />
+      <PageHeader title="Analytics" />
       <Toolbar>
         <Select className="w-36" aria-label="Agent" value={filters.agent} onChange={(event) => setFilters({ ...filters, agent: event.target.value })}>
           <AgentOptions />

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import logging
+import math
 import os
 import sqlite3
 import sys
@@ -74,15 +75,28 @@ class CursorAdapter:
                                         _save_metadata(metadata, entry.get("composerId"), entry)
                     if "cursorDiskKV" in tables:
                         # Project metadata inside SQLite rather than loading chat bodies.
-                        for key, name, created_at, selected_model in db.execute("""
+                        for key, name, created_at, selected_model, workspace in db.execute("""
                             SELECT key, json_extract(value, '$.name'), json_extract(value, '$.createdAt'),
-                                   json_extract(value, '$.modelConfig.modelName') FROM cursorDiskKV
+                                   json_extract(value, '$.modelConfig.modelName'),
+                                   json_extract(value, '$.workspaceIdentifier') FROM cursorDiskKV
                             WHERE key LIKE 'composerData:%' AND json_valid(value)
                         """):
                             _save_metadata(metadata, key.removeprefix("composerData:"), {
                                 "name": name, "createdAt": created_at,
                                 "modelConfig": {"modelName": selected_model},
+                                "workspaceIdentifier": json.loads(workspace) if workspace else None,
                             })
+                        durations: dict[str, dict[str, float]] = {}
+                        for key, duration in db.execute("""
+                            SELECT key, json_extract(value, '$.turnDurationMs') FROM cursorDiskKV
+                            WHERE key LIKE 'bubbleId:%' AND json_valid(value)
+                              AND json_type(value, '$.turnDurationMs') IN ('integer', 'real')
+                        """):
+                            parts = key.split(":")
+                            if len(parts) == 3 and math.isfinite(duration) and duration >= 0:
+                                durations.setdefault(parts[1], {})[key] = duration
+                        for sid, values in durations.items():
+                            metadata.setdefault(sid, {}).setdefault("turn_durations", {}).update(values)
                         for key, value in db.execute("""
                             SELECT key, value FROM cursorDiskKV
                             WHERE key LIKE 'bubbleId:%' AND json_valid(value)
@@ -114,6 +128,9 @@ class CursorAdapter:
         except (OSError, sqlite3.Error, ValueError, TypeError):
             log.warning("could not read Cursor session metadata from %s", base)
             return None
+        for entry in metadata.values():
+            if entry.get("turn_durations"):
+                entry["duration_sec"] = sum(entry.pop("turn_durations").values()) / 1000
         return metadata
 
     def discover(self, root: Path) -> list[Path]:
@@ -193,6 +210,11 @@ def _save_metadata(metadata: dict[str, dict], sid, data: dict) -> None:
     if not isinstance(sid, str) or not sid:
         return
     entry = metadata.setdefault(sid, {})
+    workspace = data.get("workspaceIdentifier")
+    uri = workspace.get("uri") if isinstance(workspace, dict) else None
+    cwd = uri.get("fsPath") if isinstance(uri, dict) and uri.get("scheme") == "file" else None
+    if isinstance(cwd, str) and cwd.strip():
+        entry["project_cwd"] = cwd
     name = data.get("name")
     if isinstance(name, str):
         entry["title"] = name.strip() or None

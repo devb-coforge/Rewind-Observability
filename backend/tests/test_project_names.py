@@ -1,4 +1,8 @@
+import re
+from pathlib import Path
+
 from obs.db.repo import Store
+from obs.gitroot import git_worktree_root
 
 
 def test_rename_applies_to_shared_path_and_survives_rebuild(client):
@@ -92,5 +96,69 @@ def test_cursor_workspace_alias_does_not_merge_ambiguous_paths(tmp_path):
                                       "project_id": sid, "project_cwd": cwd, "project_name": "work-a-b",
                                       "source_path": "/tmp/cursor/projects/work-a-b/agent-transcripts/three.jsonl"})
         assert store.project_group_paths()["three"] is None
+    finally:
+        store.close()
+
+
+def test_git_worktree_root_uses_the_nearest_marker(tmp_path):
+    repo = tmp_path / "repo"
+    nested = repo / "vendor" / "lib"
+    (nested / "src").mkdir(parents=True)
+    (repo / "frontend").mkdir()
+    (repo / ".git").mkdir()
+    (nested / ".git").write_text("gitdir: /elsewhere\n")
+    assert git_worktree_root(str(repo / "frontend")) == str(repo)
+    assert git_worktree_root(str(nested / "src")) == str(nested)
+    assert git_worktree_root(str(tmp_path / "loose")) is None
+    assert git_worktree_root(None) is None
+
+
+def test_subdirectory_sessions_group_at_the_git_root(tmp_path):
+    repo = tmp_path / "Observability-System"
+    frontend = repo / "frontend"
+    frontend.mkdir(parents=True)
+    (repo / ".git").mkdir()
+    other = tmp_path / "other"
+    other.mkdir()
+    store = Store(tmp_path / "data")
+    try:
+        def insert(sid, project_id, cwd, agent="claude_code", name=None, source_path=None):
+            store.ensure_session({
+                "id": sid,
+                "project_id": project_id,
+                "project_cwd": cwd,
+                "project_name": name or (Path(cwd).name if cwd else sid),
+                "agent": agent,
+                "native_id": sid,
+                "source_path": source_path or f"/tmp/{sid}",
+            })
+
+        slug = re.sub(r"[^a-zA-Z0-9-]", "-", str(frontend)).strip("-")
+        with store.transaction():
+            insert("root", "root", str(repo), "codex", "Observability-System")
+            insert("front", "front", str(frontend), "claude_code", "rewind-icon")
+            insert(
+                "cursor", "cursor-id", None, "cursor", "frontend-workspace",
+                f"/tmp/cursor/projects/{slug}/agent-transcripts/cursor.jsonl",
+            )
+            insert("out", "out", str(other), "codex", "other")
+        paths = store.project_group_paths()
+        assert paths["root"] == str(repo)
+        assert paths["front"] == str(repo)
+        assert paths["cursor-id"] == str(repo)
+        assert paths["out"] == str(other)
+        projects = {item["project_id"]: item for item in store.list_projects(True)}
+        assert projects["front"]["cwd"] == str(frontend)
+        assert projects["front"]["group_cwd"] == str(repo)
+        assert projects["front"]["name"] == "Observability-System"
+        assert projects["cursor-id"]["name"] == "Observability-System"
+        assert {item["id"] for item in store.list_sessions(project_cwd=str(repo))["sessions"]} == {
+            "root", "front", "cursor",
+        }
+        assert store.rename_project("front", "Unified", "now")
+        assert store.get_session("root")["project_name"] == "Unified"
+        with store.transaction():
+            insert("front2", "front2", str(frontend), "claude_code", "frontend")
+        assert store.get_session("front2")["project_name"] == "Unified"
     finally:
         store.close()

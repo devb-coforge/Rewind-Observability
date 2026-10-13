@@ -1,5 +1,5 @@
 import { ChevronDown, Loader2 } from "lucide-react";
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes } from "react";
 import { AgentIcon } from "./AgentIcon";
 import { agentLabel } from "../lib/format";
 import { cn } from "../lib/cn";
@@ -24,10 +24,16 @@ export function Button({
   size = "md",
   className,
   type = "button",
+  ref,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: ButtonSize }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  ref?: Ref<HTMLButtonElement>;
+}) {
   return (
     <button
+      ref={ref}
       type={type}
       className={cn(
         "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",

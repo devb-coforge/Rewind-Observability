@@ -10,6 +10,12 @@ CREATE TABLE IF NOT EXISTS project_preferences (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS session_preferences (
+  session_id TEXT PRIMARY KEY,
+  hidden INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS project_names (
   project_key TEXT PRIMARY KEY,
   project_name TEXT NOT NULL,

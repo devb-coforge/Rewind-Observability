@@ -60,3 +60,31 @@ def test_existing_index_schema_migrates_without_rebuild(tmp_path):
     store = Store(tmp_path)
     assert "source_title" in {row["name"] for row in store.index.execute("PRAGMA table_info(sessions)")}
     store.close()
+
+
+def test_claude_saved_titles_and_clean_prompt_fallback(client, source_dirs):
+    claude, _ = source_dirs
+    transcript = next(p for p in claude.rglob("*.jsonl") if p.stem == CLAUDE.split(":")[1])
+    original = transcript.read_text()
+    commands = [
+        {"type": "user", "uuid": "notice", "message": {"content": "<local-command-caveat>Local context</local-command-caveat>"}},
+        {"type": "user", "uuid": "command", "message": {"content": "<command-name>/clear</command-name>"}},
+        {"type": "user", "uuid": "stdout", "message": {"content": "<local-command-stdout>Cleared</local-command-stdout>"}},
+    ]
+    transcript.write_text("".join(json.dumps(r) + "\n" for r in commands) + original)
+    client.post("/api/reindex")
+    assert client.get(f"/api/sessions/{CLAUDE}").json()["title"] == "Please fix the parser"
+    sid = CLAUDE.split(":")[1]
+    with transcript.open("a") as handle:
+        handle.write(json.dumps({"type": "ai-title", "sessionId": sid, "aiTitle": "Parser repair"}) + "\n")
+    client.post("/api/reindex")
+    assert client.get(f"/api/sessions/{CLAUDE}").json()["title"] == "Parser repair"
+    with transcript.open("a") as handle:
+        handle.write(json.dumps({"type": "custom-title", "sessionId": sid, "customTitle": "My parser session"}) + "\n")
+        handle.write(json.dumps({"type": "ai-title", "sessionId": sid, "aiTitle": "Updated AI title"}) + "\n")
+    client.post("/api/reindex")
+    assert client.get(f"/api/sessions/{CLAUDE}").json()["title"] == "My parser session"
+    assert client.post("/api/reindex").json()["files_parsed"] == 0
+    client.post("/api/reindex?full=true")
+    assert client.get(f"/api/sessions/{CLAUDE}").json()["title"] == "My parser session"
+    assert client.get("/api/sessions", params={"q": "My parser session"}).json()["sessions"][0]["id"] == CLAUDE

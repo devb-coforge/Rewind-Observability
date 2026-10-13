@@ -13,7 +13,8 @@ export function groupProjectsByPath(projects: Project[]) {
     const group = groups.get(key);
     if (group) {
       group.projects.push(project);
-      if (project.cwd) group.name = project.name;
+      // A subdirectory checkout keeps the name recorded at the worktree root.
+      if (project.cwd && project.cwd === cwd) group.name = project.name;
     } else {
       groups.set(key, { key, name: project.name, cwd, projects: [project] });
     }

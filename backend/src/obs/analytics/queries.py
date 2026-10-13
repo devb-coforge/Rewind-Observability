@@ -140,16 +140,17 @@ def summary(store: Store, filters: dict) -> dict:
         """,
         params,
     ).fetchone()
-    durations = [
-        (item["ended_at"], item["started_at"])
-        for item in store.index.execute(
-            f"SELECT started_at, ended_at FROM sessions s WHERE {where} AND started_at IS NOT NULL AND ended_at IS NOT NULL",
-            params,
-        )
-    ]
     from obs.db.repo import _duration
 
-    seconds = [value for value in (_duration(start, end) for end, start in durations) if value is not None]
+    seconds = []
+    for item in store.index.execute(
+        f"SELECT started_at, ended_at, source_duration_sec FROM sessions s WHERE {where}", params,
+    ):
+        value = item["source_duration_sec"]
+        if value is None:
+            value = _duration(item["started_at"], item["ended_at"])
+        if value is not None:
+            seconds.append(value)
     sessions = row["sessions"] or 0
     if sessions == 0 or (row["missing_usage"] == sessions):
         usage_coverage = "none"
@@ -199,7 +200,7 @@ def timeseries(store: Store, filters: dict, *, metric: str, bucket: str, group_b
         "sessions": "COUNT(*)",
         "tokens": "SUM(CASE WHEN s.tokens_in IS NULL AND s.tokens_out IS NULL THEN NULL ELSE COALESCE(s.tokens_in, 0) + COALESCE(s.tokens_out, 0) END)",
         "cost": "SUM(s.est_cost_usd)",
-        "duration": "AVG((julianday(s.ended_at) - julianday(s.started_at)) * 86400.0)",
+        "duration": "AVG(COALESCE(s.source_duration_sec, (julianday(s.ended_at) - julianday(s.started_at)) * 86400.0))",
     }.get(metric, "COUNT(*)")
     rows = store.index.execute(
         f"""

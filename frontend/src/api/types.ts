@@ -25,6 +25,7 @@ export type Session = {
   project_name: string | null;
   project_id: string;
   project_hidden: boolean;
+  hidden: boolean;
   git_branch: string | null;
   models: string[];
   selected_model?: string | null;

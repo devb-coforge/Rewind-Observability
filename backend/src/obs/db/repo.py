@@ -11,6 +11,7 @@ from pathlib import Path
 
 from obs.adapters.lineio import preview, to_iso
 from obs.analytics.pricing import Pricing
+from obs.gitroot import git_worktree_root
 from obs.identity import classify_paths, path_is_allowed, project_identity
 from obs.models import Usage
 
@@ -42,6 +43,8 @@ class Store:
             self.index.execute("ALTER TABLE sessions ADD COLUMN source_models_json TEXT NOT NULL DEFAULT '[]'")
         if "selected_model" not in columns:
             self.index.execute("ALTER TABLE sessions ADD COLUMN selected_model TEXT")
+        if "source_duration_sec" not in columns:
+            self.index.execute("ALTER TABLE sessions ADD COLUMN source_duration_sec REAL")
         self.user.executescript(USER_SCHEMA)
         user_tables = {
             row["name"] for row in self.user.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -167,7 +170,8 @@ class Store:
 
     def ensure_session(self, fields: dict) -> None:
         fields = dict(fields)
-        key = self.project_name_key(fields.get("project_cwd"), fields["project_id"])
+        cwd = fields.get("project_cwd")
+        key = self.project_name_key(git_worktree_root(cwd) or cwd, fields["project_id"])
         custom = self.user.execute("SELECT project_name FROM project_names WHERE project_key = ?", (key,)).fetchone()
         if custom:
             fields["project_name"] = custom["project_name"]
@@ -353,7 +357,12 @@ class Store:
                 if row["model"] not in models:
                     models.append(row["model"])
             if title is None and row["role"] == "user" and row["kind"] == "message" and row["text"]:
-                title = " ".join(row["text"].split())[:120]
+                if session["agent"] == "claude_code":
+                    from obs.adapters.claude_code import title_prompt
+
+                    title = title_prompt(row["text"])
+                else:
+                    title = " ".join(row["text"].split())[:120]
             if row["role"] == "user" and row["kind"] == "message":
                 n_user += 1
             if row["kind"] == "tool_call":
@@ -429,6 +438,13 @@ class Store:
         boundary = 0
         for row in rows:
             paths = json.loads(row["paths_json"] or "[]")
+            if row["kind"] == "tool_call":
+                from obs.identity import extract_path_refs
+
+                paths = classify_paths(session["project_cwd"], extract_path_refs(
+                    row["tool_name"], json.loads(row["tool_input_json"] or "null")))
+                self.index.execute("UPDATE events SET paths_json = ? WHERE id = ?",
+                                   (json.dumps(paths) if paths else None, row["id"]))
             if any(
                 item.get("outside") and not path_is_allowed(item.get("resolved") or "", prefixes)
                 for item in paths
@@ -541,6 +557,31 @@ class Store:
             (project_id, 1 if hidden else 0, now),
         )
 
+    def hidden_session_ids(self) -> list[str]:
+        return [
+            row["session_id"]
+            for row in self.user.execute(
+                "SELECT session_id FROM session_preferences WHERE hidden = 1"
+            )
+        ]
+
+    def is_session_hidden(self, session_id: str) -> bool:
+        row = self.user.execute(
+            "SELECT hidden FROM session_preferences WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        return bool(row and row["hidden"])
+
+    def set_session_hidden(self, session_id: str, hidden: bool, now: str) -> None:
+        self.user.execute(
+            """
+            INSERT INTO session_preferences(session_id, hidden, updated_at)
+            VALUES(?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET hidden = excluded.hidden, updated_at = excluded.updated_at
+            """,
+            (session_id, 1 if hidden else 0, now),
+        )
+
     def get_note(self, session_id: str) -> sqlite3.Row | None:
         return self.user.execute(
             "SELECT session_id, text, updated_at FROM session_notes WHERE session_id = ?",
@@ -599,6 +640,7 @@ class Store:
                 slug = re.sub(r"[^a-zA-Z0-9-]", "-", row["project_cwd"]).strip("-")
                 candidates.setdefault(slug, set()).add(row["project_cwd"])
         paths = {}
+        roots: dict[str, str] = {}
         for row in rows:
             cwd = row["project_cwd"]
             if not cwd and row["agent"] == "cursor":
@@ -608,6 +650,11 @@ class Store:
                     matches = candidates.get(parts[position - 1], set()) if position else set()
                     if len(matches) == 1:
                         cwd = next(iter(matches))
+            if cwd:
+                if cwd not in roots:
+                    # A checkout opened at a subdirectory shares the worktree root.
+                    roots[cwd] = git_worktree_root(cwd) or cwd
+                cwd = roots[cwd]
             paths[row["project_id"]] = cwd
         return paths
 
@@ -657,11 +704,19 @@ class Store:
             is_hidden = row["project_id"] in hidden
             if is_hidden and not include_hidden:
                 continue
+            group = group_paths[row["project_id"]]
+            recorded = path_names.get(group) if group else None
+            if recorded:
+                name = recorded
+            elif group and row["project_cwd"] and group != row["project_cwd"]:
+                name = group.rstrip("/").split("/")[-1] or row["project_name"] or "(unknown)"
+            else:
+                name = row["project_name"] or "(unknown)"
             projects.append(
                 {
                     "project_id": row["project_id"],
                     "agent": row["agent"],
-                    "name": path_names.get(group_paths[row["project_id"]]) or row["project_name"] or "(unknown)",
+                    "name": name,
                     "cwd": row["project_cwd"],
                     "group_cwd": group_paths[row["project_id"]],
                     "hidden": is_hidden,
@@ -701,7 +756,9 @@ class Store:
 
     def session_dict(self, row: sqlite3.Row, group_paths: dict[str, str | None] | None = None) -> dict:
         models = json.loads(row["models_json"] or "[]")
-        duration = _duration(row["started_at"], row["ended_at"])
+        duration = row["source_duration_sec"]
+        if duration is None:
+            duration = _duration(row["started_at"], row["ended_at"])
         return {
             "id": row["id"],
             "agent": row["agent"],
@@ -712,6 +769,7 @@ class Store:
             "project_name": row["project_name"],
             "project_id": row["project_id"],
             "project_hidden": self.is_hidden(row["project_id"]),
+            "hidden": self.is_session_hidden(row["id"]),
             "git_branch": row["git_branch"],
             "models": models,
             "selected_model": row["selected_model"],
@@ -873,11 +931,16 @@ class Store:
             clauses.append("COALESCE(s.title, '') LIKE ? ESCAPE '\\'")
             params.append(like)
         if not filters.get("include_hidden"):
-            hidden = self.hidden_ids()
-            if hidden:
-                marks = ",".join("?" for _ in hidden)
+            hidden_projects = self.hidden_ids()
+            if hidden_projects:
+                marks = ",".join("?" for _ in hidden_projects)
                 clauses.append(f"s.project_id NOT IN ({marks})")
-                params.extend(hidden)
+                params.extend(hidden_projects)
+            hidden_sessions = self.hidden_session_ids()
+            if hidden_sessions:
+                marks = ",".join("?" for _ in hidden_sessions)
+                clauses.append(f"s.id NOT IN ({marks})")
+                params.extend(hidden_sessions)
         if filters.get("boundary_only"):
             clauses.append("s.boundary_count > 0")
         return " AND ".join(clauses), params
@@ -888,7 +951,7 @@ def _sort_clause(sort: str, cursor: str | None) -> tuple[str, str, list]:
         "started_at": "COALESCE(s.started_at, '') DESC, s.id DESC",
         "cost": "COALESCE(s.est_cost_usd, -1) DESC, s.id DESC",
         "tokens": "(COALESCE(s.tokens_in, 0) + COALESCE(s.tokens_out, 0)) DESC, s.id DESC",
-        "duration": "(julianday(s.ended_at) - julianday(s.started_at)) DESC, s.id DESC",
+        "duration": "COALESCE(s.source_duration_sec, (julianday(s.ended_at) - julianday(s.started_at)) * 86400.0) DESC, s.id DESC",
         "errors": "s.n_tool_errors DESC, s.id DESC",
     }
     order = orders.get(sort, orders["started_at"])

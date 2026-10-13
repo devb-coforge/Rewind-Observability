@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useBlocker } from "react-router-dom";
 import type { Note } from "../api/types";
 import { cn } from "../lib/cn";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { Button } from "./ui";
 
 export function NoteEditor({
@@ -15,6 +16,7 @@ export function NoteEditor({
   const [savedText, setSavedText] = useState(initial.text);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState("");
+  const [confirmClear, setConfirmClear] = useState(false);
   const dirty = text !== savedText;
 
   useEffect(() => {
@@ -50,7 +52,10 @@ export function NoteEditor({
   }
 
   function clear() {
-    if (dirty && !window.confirm("Discard unsaved edits and clear the note?")) return;
+    if (dirty) {
+      setConfirmClear(true);
+      return;
+    }
     void save("");
   }
 
@@ -107,6 +112,18 @@ export function NoteEditor({
           Save
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmClear}
+        title="Discard unsaved edits?"
+        description="Clearing will discard your unsaved edits and empty the note."
+        confirmLabel="Discard edits"
+        tone="danger"
+        onConfirm={() => {
+          setConfirmClear(false);
+          void save("");
+        }}
+        onCancel={() => setConfirmClear(false)}
+      />
     </div>
   );
 }

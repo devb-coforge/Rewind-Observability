@@ -1,16 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { api } from "../api/client";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { AgentBadge, Badge, Button, Card, ErrorText, Page, PageHeader, SectionTitle, td, th } from "../components/ui";
 import { cn } from "../lib/cn";
 import { formatTime } from "../lib/format";
 
 export function SourcesPage() {
   const queryClient = useQueryClient();
+  const [confirmRebuild, setConfirmRebuild] = useState(false);
   const sources = useQuery({ queryKey: ["sources"], queryFn: api.sources });
   const scan = useMutation({
     mutationFn: (full: boolean) => api.reindex(full),
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      setConfirmRebuild(false);
+      queryClient.invalidateQueries();
+    },
   });
   const otel = sources.data?.otel;
 
@@ -18,21 +24,14 @@ export function SourcesPage() {
     <Page>
       <PageHeader
         title="Sources"
-        description={
-          sources.data?.last_indexed_at
-            ? `Transcript folders being indexed. Last indexed ${formatTime(sources.data.last_indexed_at)}.`
-            : "Transcript folders being indexed."
-        }
         actions={
           <>
-            <Button
-              disabled={scan.isPending}
-              onClick={() => {
-                if (window.confirm("Rebuild the index?")) {
-                  scan.mutate(true);
-                }
-              }}
-            >
+            {sources.data?.last_indexed_at ? (
+              <span className="self-center text-xs tabular-nums text-subtle">
+                Last indexed {formatTime(sources.data.last_indexed_at)}
+              </span>
+            ) : null}
+            <Button disabled={scan.isPending} onClick={() => setConfirmRebuild(true)}>
               Full rebuild
             </Button>
             <Button variant="primary" onClick={() => scan.mutate(false)} disabled={scan.isPending}>
@@ -43,6 +42,7 @@ export function SourcesPage() {
         }
       />
       {scan.isError ? <ErrorText>{(scan.error as Error).message}</ErrorText> : null}
+      <SectionTitle>Transcript folders</SectionTitle>
       <Card className="mb-8 overflow-x-auto">
         <table className="w-full min-w-[640px] text-[13px]">
           <thead className="bg-surface2/50">
@@ -104,6 +104,16 @@ export function SourcesPage() {
           </div>
         </div>
       </Card>
+      <ConfirmDialog
+        open={confirmRebuild}
+        title="Rebuild the index?"
+        description="This re-scans every transcript folder from scratch and can take a while. Use Rescan for routine updates."
+        confirmLabel="Rebuild index"
+        icon={<RefreshCw aria-hidden="true" className="size-4" />}
+        pending={scan.isPending}
+        onConfirm={() => scan.mutate(true)}
+        onCancel={() => setConfirmRebuild(false)}
+      />
     </Page>
   );
 }

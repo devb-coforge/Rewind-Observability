@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import { SessionGroups } from "../components/SessionGroups";
 import { AgentOptions, Button, ErrorText, Input, Loading, Page, PageHeader, Select, Toolbar } from "../components/ui";
-import { groupProjectsByPath, projectGroupKey } from "../lib/projects";
+import { groupProjectsByPath } from "../lib/projects";
 
 export function SessionsPage() {
   const queryClient = useQueryClient();
@@ -39,14 +39,7 @@ export function SessionsPage() {
 
   return (
     <Page>
-      <PageHeader
-        title="Sessions"
-        description={
-          sessions.isSuccess
-            ? `${rows.length}${sessions.hasNextPage ? "+" : ""} sessions across ${new Set(rows.map((row) => projectGroupKey(row.project_group_cwd || row.project_cwd, row.project_id))).size} projects`
-            : "Agent sessions grouped by project"
-        }
-      />
+      <PageHeader title="Sessions" />
       <Toolbar>
         <Input
           className="min-w-56 flex-1"
@@ -104,6 +97,10 @@ export function SessionsPage() {
           onSetHidden={async (projectId, hidden) => {
             await api.setHidden(projectId, hidden);
             await queryClient.invalidateQueries({ queryKey: ["projects"] });
+            await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+          }}
+          onSetSessionHidden={async (sessionId, hidden) => {
+            await api.setSessionHidden(sessionId, hidden);
             await queryClient.invalidateQueries({ queryKey: ["sessions"] });
           }}
         />

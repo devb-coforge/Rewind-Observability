@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 class CodexAdapter:
     name = "codex"
-    version = 2
+    version = 3
 
     def detect(self, root: Path) -> bool:
         return infer_agent_from_path(root) == "codex"
@@ -135,6 +135,10 @@ class CodexAdapter:
         typ = obj.get("type")
         payload = obj.get("payload") if isinstance(obj.get("payload"), dict) else {}
         native = _line_native(obj, payload)
+        if native and native.startswith("ord-"):
+            # Rollout ordinals restart in every conversation. Event identities
+            # must include the session to avoid losing records from other chats.
+            native = f"{result.native_id}:{native}"
 
         if typ == "session_meta":
             sid = payload.get("id") or payload.get("session_id")

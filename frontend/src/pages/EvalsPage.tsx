@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { EvalCase } from "../api/types";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Button, Card, EmptyState, Input, Page, PageHeader, SectionTitle, Select, td, th, Toolbar } from "../components/ui";
 import { cn } from "../lib/cn";
 import { formatCompact, formatCost, formatPercent } from "../lib/format";
@@ -31,7 +32,7 @@ export function EvalsPage() {
 
   return (
     <Page>
-      <PageHeader title="Evals" description="Frozen session slices, labeled pass or fail, compared by model." />
+      <PageHeader title="Evals" />
       <Toolbar>
         <Select className="w-52" aria-label="Project" value={project} onChange={(event) => setProject(event.target.value)}>
           <option value="">All projects</option>
@@ -113,6 +114,7 @@ function CaseCard({ item, onChange }: { item: EvalCase; onChange: () => Promise<
   const [note, setNote] = useState(item.note ?? "");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const detail = useQuery({
     queryKey: ["evals", "case", item.id],
     queryFn: () => api.case(item.id),
@@ -184,21 +186,24 @@ function CaseCard({ item, onChange }: { item: EvalCase; onChange: () => Promise<
           <ChevronDown aria-hidden="true" className={cn("size-3.5 transition-transform", open && "rotate-180")} />
           {open ? "Hide detail" : "Show detail"}
         </Button>
-        <Button
-          size="sm"
-          variant="danger"
-          className="h-8"
-          onClick={() => {
-            if (window.confirm("Delete this case?")) {
-              void api.deleteCase(item.id).then(onChange);
-            }
-          }}
-        >
+        <Button size="sm" variant="danger" className="h-8" onClick={() => setConfirmDelete(true)}>
           <Trash2 aria-hidden="true" className="size-3.5" />
           Delete
         </Button>
       </div>
       {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this case?"
+        description="This removes the frozen eval case. This can't be undone."
+        confirmLabel="Delete case"
+        tone="danger"
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void api.deleteCase(item.id).then(onChange);
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </Card>
   );
 }

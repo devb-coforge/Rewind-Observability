@@ -32,6 +32,35 @@ def test_codex_maps_messages_tools_and_last_token_usage():
     assert any(event.kind == "unknown" or (event.kind == "system" and event.text == "agent_message") for event in result.events)
 
 
+def test_rollout_ordinals_are_scoped_to_session_and_usage_survives_rescans(tmp_path):
+    from fastapi.testclient import TestClient
+    from obs.config import AppConfig, SourceConfig
+    from obs.main import create_app
+
+    root = tmp_path / "codex"
+    root.mkdir()
+    for sid, tokens in (("one", 100), ("two", 200)):
+        records = [
+            {"ordinal": 0, "type": "session_meta", "payload": {"id": sid, "cwd": "/work"}},
+            {"ordinal": 1, "type": "turn_context", "payload": {"model": "gpt-4o"}},
+            {"ordinal": 2, "type": "token_usage_record", "payload": {
+                "usage": {"input_tokens": tokens, "output_tokens": 10}}},
+            {"ordinal": 3, "type": "event_msg", "payload": {"type": "token_count", "info": {
+                "last_token_usage": {"input_tokens": tokens, "output_tokens": 10}}}},
+        ]
+        (root / f"rollout-{sid}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
+    app = create_app(AppConfig(sources=[SourceConfig(path=str(root))],
+                              data_dir=tmp_path / "data", ingest_on_startup=False))
+    with TestClient(app) as client:
+        for full in (False, False, True):
+            client.post(f"/api/reindex?full={str(full).lower()}")
+            for sid, tokens in (("one", 100), ("two", 200)):
+                session = client.get(f"/api/sessions/codex:{sid}").json()
+                assert session["tokens_in"] == tokens
+                assert session["tokens_out"] == 10
+                assert session["n_events"] == 4
+
+
 def test_interpret_exec_command_and_apply_patch():
     name, payload = interpret_tool("exec", 'text(await tools.exec_command({cmd:"pwd"}));')
     assert name == "exec_command"

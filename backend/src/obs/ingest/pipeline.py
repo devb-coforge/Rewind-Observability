@@ -80,7 +80,7 @@ class Ingestor:
                     ) if adapter.name == "cursor" else adapter.session_titles(root)
                     if titles is not None:
                         sessions = list(self.store.index.execute(
-                            "SELECT id, native_id, source_path, source_title, started_at, source_models_json, selected_model FROM sessions WHERE agent = ?",
+                            "SELECT * FROM sessions WHERE agent = ?",
                             (adapter.name,),
                         ))
                         for session in sessions:
@@ -95,6 +95,25 @@ class Ingestor:
                             created_at = (metadata or {}).get(session["native_id"], {}).get("started_at")
                             if metadata is not None:
                                 entry = metadata.get(session["native_id"], {})
+                                duration = entry.get("duration_sec")
+                                if duration != session["source_duration_sec"]:
+                                    self.store.index.execute(
+                                        "UPDATE sessions SET source_duration_sec = ? WHERE id = ?",
+                                        (duration, session["id"]),
+                                    )
+                                    affected.add(session["id"])
+                                cwd = entry.get("project_cwd")
+                                cwd_key = f"cursor_workspace:{session['id']}"
+                                previous_cwd = self.store.get_meta(cwd_key)
+                                if cwd and (not session["project_cwd"] or session["project_cwd"] == previous_cwd):
+                                    identity = project_fields(adapter.name, cwd)
+                                    if identity["project_cwd"] != session["project_cwd"]:
+                                        self.store.index.execute(
+                                            "UPDATE sessions SET project_cwd = ?, project_id = ?, project_name = ? WHERE id = ?",
+                                            (identity["project_cwd"], identity["project_id"], identity["project_name"], session["id"]),
+                                        )
+                                        affected.add(session["id"])
+                                    self.store.set_meta(cwd_key, identity["project_cwd"])
                                 models_json = json.dumps(entry.get("models", []))
                                 selected_model = entry.get("selected_model")
                                 if models_json != session["source_models_json"] or selected_model != session["selected_model"]:

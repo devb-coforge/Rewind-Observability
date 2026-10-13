@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import logging
 
 from obs.adapters.detect import infer_agent_from_path
 from obs.adapters.discovery import discover_files
@@ -17,12 +18,52 @@ _BOOKKEEPING_TYPES = {
     "file-history-snapshot",
     "last-prompt",
     "cost-state",
+    "ai-title",
+    "custom-title",
 }
+
+log = logging.getLogger(__name__)
+
+
+def title_prompt(text: str) -> str | None:
+    """Local CLI notices and slash commands are context, not session names."""
+    cleaned = text.strip()
+    if cleaned.startswith(("<local-command-caveat>", "<local-command-stdout>",
+                           "<local-command-stderr>", "<command-name>",
+                           "<command-message>")):
+        return None
+    return " ".join(cleaned.split())[:120] or None
 
 
 class ClaudeCodeAdapter:
     name = "claude_code"
-    version = 2
+    version = 3
+
+    def session_titles(self, root: Path) -> dict[str, str] | None:
+        ai_titles: dict[str, str] = {}
+        custom_titles: dict[str, str] = {}
+        try:
+            for path in self.discover(root):
+                for line in path.open("rb"):
+                    obj, ok = loads_obj(line)
+                    if not ok or obj is None:
+                        continue
+                    typ = obj.get("type")
+                    if typ not in {"ai-title", "custom-title"}:
+                        continue
+                    sid = obj.get("sessionId") or self.native_id_from_path(path)
+                    title = obj.get("aiTitle" if typ == "ai-title" else "customTitle")
+                    if not isinstance(sid, str) or not isinstance(title, str):
+                        continue
+                    target = ai_titles if typ == "ai-title" else custom_titles
+                    if title.strip():
+                        target[sid] = title.strip()
+                    else:
+                        target.pop(sid, None)
+        except OSError:
+            log.warning("could not read Claude Code session names from %s", root)
+            return None
+        return ai_titles | custom_titles
 
     def detect(self, root: Path) -> bool:
         return infer_agent_from_path(root) == "claude_code"

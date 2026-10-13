@@ -58,6 +58,11 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ hidden }),
     }),
+  setSessionHidden: (sessionId: string, hidden: boolean) =>
+    request<{ session_id: string; hidden: boolean }>(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ hidden }),
+    }),
   renameProject: (projectId: string, name: string) =>
     request<{ project_id: string; name: string }>(`/api/projects/${encodeURIComponent(projectId)}/name`, {
       method: "PUT",

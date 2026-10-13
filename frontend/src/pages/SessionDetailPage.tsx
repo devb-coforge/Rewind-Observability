@@ -103,6 +103,23 @@ export function SessionDetailPage() {
             {detail.git_branch ? <Meta icon={<GitBranch className="size-3.5" />} mono>{detail.git_branch}</Meta> : null}
           </div>
         </header>
+        {detail.hidden ? (
+          <div className="flex items-center justify-between gap-3 border-b border-line bg-warn/[0.06] px-5 py-2 text-xs text-muted">
+            <span>This session is hidden from session lists.</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                void api
+                  .setSessionHidden(detail.id, false)
+                  .then(() => queryClient.invalidateQueries({ queryKey: ["session", sessionId] }))
+                  .then(() => queryClient.invalidateQueries({ queryKey: ["sessions"] }))
+              }
+            >
+              Restore session
+            </Button>
+          </div>
+        ) : null}
         {detail.project_hidden ? (
           <div className="flex items-center justify-between gap-3 border-b border-line bg-warn/[0.06] px-5 py-2 text-xs text-muted">
             <span>This project is hidden from session lists.</span>

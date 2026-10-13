@@ -18,6 +18,26 @@ def test_note_survives_full_reindex(client):
     assert client.get(f"/api/sessions/{CLAUDE}/note").json()["updated_at"] is None
 
 
+def test_hide_session_filters_lists_search_and_analytics_and_survives_rebuild(client):
+    before = client.get("/api/analytics/summary", params={"agent": "claude_code"}).json()["sessions"]
+    hidden = client.patch(f"/api/sessions/{CLAUDE}", json={"hidden": True}).json()
+    assert hidden["hidden"] is True
+    listed = client.get("/api/sessions").json()["sessions"]
+    assert all(item["id"] != CLAUDE for item in listed)
+    assert client.get("/api/search", params={"q": "parser"}).json()["hits"] == []
+    assert client.get("/api/analytics/summary", params={"agent": "claude_code"}).json()["sessions"] == before - 1
+    direct = client.get(f"/api/sessions/{CLAUDE}").json()
+    assert direct["hidden"] is True
+    visible = client.get("/api/sessions", params={"include_hidden": True}).json()["sessions"]
+    assert any(item["id"] == CLAUDE for item in visible)
+    client.post("/api/reindex", params={"full": "true"})
+    still = client.get("/api/sessions").json()["sessions"]
+    assert all(item["id"] != CLAUDE for item in still)
+    client.patch(f"/api/sessions/{CLAUDE}", json={"hidden": False})
+    restored = client.get("/api/sessions").json()["sessions"]
+    assert any(item["id"] == CLAUDE for item in restored)
+
+
 def test_hide_filters_lists_search_and_analytics_and_survives_rebuild(client, source_dirs):
     project_id = _project(client)
     hidden = client.patch(f"/api/projects/{project_id}", json={"hidden": True}).json()

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   source_title TEXT,
   source_models_json TEXT NOT NULL DEFAULT '[]',
   selected_model TEXT,
+  source_duration_sec REAL,
   n_events INTEGER NOT NULL DEFAULT 0,
   n_user_msgs INTEGER NOT NULL DEFAULT 0,
   n_tool_calls INTEGER NOT NULL DEFAULT 0,

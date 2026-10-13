@@ -15,6 +15,20 @@ const project: Project = {
   n_sessions: 1,
 };
 
+async function expandProjectAndAgents(
+  user: ReturnType<typeof userEvent.setup>,
+  projectName = "proj",
+  agents = ["Claude Code"],
+) {
+  const projectToggle = screen.getByRole("button", { name: new RegExp(`^(Expand|Collapse) ${projectName}$`) });
+  if (projectToggle.getAttribute("aria-expanded") === "false") {
+    await user.click(projectToggle);
+  }
+  for (const agent of agents) {
+    await user.click(screen.getByRole("button", { name: `Expand ${agent} sessions` }));
+  }
+}
+
 function session(): Session {
   return {
     id: "claude_code:s1",
@@ -25,6 +39,7 @@ function session(): Session {
     project_name: "proj",
     project_id: "p1",
     project_hidden: false,
+    hidden: false,
     git_branch: "main",
     models: ["claude-sonnet-4"],
     parent_session_id: null,
@@ -60,6 +75,7 @@ function Harness() {
       includeHidden={includeHidden}
       onIncludeHidden={setIncludeHidden}
       onSetHidden={async (_id, next) => setHidden(next)}
+      onSetSessionHidden={async () => {}}
     />
   );
 }
@@ -72,7 +88,7 @@ describe("hide and restore", () => {
         <Harness />
       </MemoryRouter>,
     );
-    await user.click(screen.getByRole("button", { name: "Expand proj" }));
+    await expandProjectAndAgents(user);
     expect(screen.getByText("Fix the parser")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Hide proj" }));
@@ -83,10 +99,33 @@ describe("hide and restore", () => {
     expect(screen.getByText("Fix the parser")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Hide proj" }));
-    await user.click(screen.getByRole("checkbox", { name: "Show hidden projects" }));
+    await user.click(screen.getByRole("checkbox", { name: "Show hidden projects and sessions" }));
     expect(screen.getByText("Fix the parser")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Restore proj" }));
     expect(screen.getByRole("button", { name: "Hide proj" })).toBeInTheDocument();
+  });
+
+  it("hides a single session and can undo it", async () => {
+    const user = userEvent.setup();
+    const onSetSessionHidden = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MemoryRouter>
+        <SessionGroups
+          projects={[project]}
+          sessions={[session()]}
+          includeHidden={false}
+          onIncludeHidden={() => {}}
+          onSetHidden={async () => {}}
+          onSetSessionHidden={onSetSessionHidden}
+        />
+      </MemoryRouter>,
+    );
+    await expandProjectAndAgents(user);
+    await user.click(screen.getByRole("button", { name: "Hide Fix the parser" }));
+    expect(onSetSessionHidden).toHaveBeenCalledWith("claude_code:s1", true);
+    expect(screen.getByRole("status")).toHaveTextContent("Hid Fix the parser.");
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(onSetSessionHidden).toHaveBeenCalledWith("claude_code:s1", false);
   });
 });
 
@@ -99,12 +138,13 @@ describe("project path grouping", () => {
           projects={projects}
           sessions={projects.map((item) => ({
             ...session(), id: `${item.agent}:${item.project_id}`, agent: item.agent,
-            project_id: item.project_id, project_cwd: item.cwd, project_hidden: item.hidden,
+            project_id: item.project_id, project_cwd: item.cwd, project_hidden: item.hidden, hidden: false,
             title: `${item.agent} task`,
           }))}
           includeHidden={includeHidden}
           onIncludeHidden={() => {}}
           onSetHidden={onSetHidden}
+          onSetSessionHidden={async () => {}}
         />
       </MemoryRouter>,
     );
@@ -134,6 +174,8 @@ describe("project path grouping", () => {
     }
     await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    await expandProjectAndAgents(user, "proj", ["Claude Code", "Codex", "Cursor"]);
     expect(screen.getAllByRole("table")).toHaveLength(3);
     for (const agent of ["claude_code", "codex", "cursor"]) {
       expect(screen.getByText(`${agent} task`)).toBeInTheDocument();
@@ -161,13 +203,14 @@ describe("project path grouping", () => {
     await user.click(screen.getByRole("button", { name: "Expand proj" }));
     expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
     expect(screen.queryByText("codex task")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Expand Claude Code sessions" }));
     expect(screen.getAllByRole("table")).toHaveLength(1);
   });
 
   it("restores a hidden project across all agents sharing a path", async () => {
     const user = userEvent.setup();
     const onSetHidden = renderGroups([{ ...project, hidden: true }, { ...project, project_id: "p2", agent: "codex", hidden: true }], true);
-    await user.click(screen.getByRole("button", { name: "Expand proj" }));
+    await expandProjectAndAgents(user, "proj", ["Claude Code", "Codex"]);
     expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
     expect(screen.getAllByRole("table")).toHaveLength(2);
     await user.click(screen.getByRole("button", { name: "Restore proj" }));
@@ -180,7 +223,7 @@ describe("project rename", () => {
     const user = userEvent.setup();
     const onRename = vi.fn().mockResolvedValue(undefined);
     render(<MemoryRouter><SessionGroups projects={[project]} sessions={[session()]} includeHidden={false}
-      onIncludeHidden={() => {}} onSetHidden={async () => {}} onRename={onRename} /></MemoryRouter>);
+      onIncludeHidden={() => {}} onSetHidden={async () => {}} onSetSessionHidden={async () => {}} onRename={onRename} /></MemoryRouter>);
     expect(screen.getByRole("button", { name: "Rename proj" })).toHaveTextContent("");
     await user.click(screen.getByRole("button", { name: "Rename proj" }));
     const input = screen.getByRole("textbox", { name: "Project name" });
@@ -200,7 +243,7 @@ describe("project rename", () => {
   it("keeps the editor open when saving fails", async () => {
     const user = userEvent.setup();
     render(<MemoryRouter><SessionGroups projects={[project]} sessions={[session()]} includeHidden={false}
-      onIncludeHidden={() => {}} onSetHidden={async () => {}}
+      onIncludeHidden={() => {}} onSetHidden={async () => {}} onSetSessionHidden={async () => {}}
       onRename={async () => { throw new Error("Rename failed"); }} /></MemoryRouter>);
     await user.click(screen.getByRole("button", { name: "Rename proj" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
