@@ -1,6 +1,7 @@
 export function agentLabel(agent: string): string {
   if (agent === "claude_code") return "Claude Code";
   if (agent === "codex") return "Codex";
+  if (agent === "cursor") return "Cursor";
   return agent;
 }
 

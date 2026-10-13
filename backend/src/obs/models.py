@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Literal
 
 
-AgentName = Literal["claude_code", "codex"]
+AgentName = Literal["claude_code", "codex", "cursor"]
 Role = Literal["user", "assistant", "system", "tool"]
 Kind = Literal[
     "message",
@@ -72,6 +72,8 @@ class ParseResult:
     native_id: str | None = None
     parent_native_id: str | None = None
     project_cwd: str | None = None
+    project_key: str | None = None
+    project_name: str | None = None
     git_branch: str | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None

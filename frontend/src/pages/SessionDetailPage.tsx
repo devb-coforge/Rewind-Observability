@@ -81,7 +81,7 @@ export function SessionDetailPage() {
         </header>
         {detail.project_hidden ? (
           <p className="border-b border-line bg-surface px-4 py-2 text-sm text-muted">
-            This project is hidden from lists, search, and analytics.{" "}
+            Hidden project ·{" "}
             <button
               type="button"
               className="text-accent"
@@ -105,12 +105,11 @@ export function SessionDetailPage() {
           <h2 className="font-medium">Stats</h2>
           <p className="text-muted">
             Tokens in/out: {formatTokens(detail.tokens_in)} / {formatTokens(detail.tokens_out)}
-            {detail.usage_coverage !== "complete" ? " (estimate, incomplete)" : " (estimate)"}
           </p>
           <p className="text-muted">
             Cache read/write: {formatTokens(detail.tokens_cache_read)} / {formatTokens(detail.tokens_cache_write)}
           </p>
-          <p className="text-muted">Cost: {formatCost(detail.est_cost_usd, detail.cost_partial)}</p>
+          <p className="text-muted">Estimated cost: {formatCost(detail.est_cost_usd, detail.cost_partial)}</p>
           <p className="text-muted">Duration: {formatDuration(detail.duration_sec)}</p>
           <p className="text-muted">
             Tool calls: {detail.n_tool_calls}, errors: {detail.n_tool_errors}
@@ -128,7 +127,6 @@ export function SessionDetailPage() {
         </section>
         <section className="space-y-2 text-sm">
           <h2 className="font-medium">Outside the recorded directory</h2>
-          <p className="text-xs text-muted">Lexical check only. Dismissing a path allows that prefix for this project.</p>
           {paths.length === 0 ? <p className="text-muted">No outside paths.</p> : null}
           {paths.map((item) => (
             <div key={item.resolved || item.path} className="rounded-md border border-line p-2">
@@ -158,7 +156,6 @@ export function SessionDetailPage() {
         />
         <section className="space-y-2 text-sm">
           <h2 className="font-medium">Freeze a benchmark case</h2>
-          <p className="text-xs text-muted">Copies this session, or a sequence range, into local cases. Nothing is sent to a model.</p>
           <div className="flex gap-2">
             <input
               className="w-24 rounded-md border border-line bg-surface px-2 py-1"

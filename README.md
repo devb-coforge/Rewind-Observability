@@ -16,6 +16,7 @@ Compose mounts:
 
 - `~/.claude` at `/sources/claude` (read-only)
 - `~/.codex` at `/sources/codex` (read-only)
+- `~/.cursor` at `/sources/cursor` (read-only)
 - a named volume `obs-data` at `/data`
 
 Set `PUID` and `PGID` if they are not `502` and `20`. The process drops to that user before it writes the database.
@@ -29,13 +30,32 @@ environment:
   OBS_SOURCES: /sources/claude,/sources/codex,/sources/extra
 ```
 
-Each source root maps to an agent by **folder name**: the last path component must be `.claude` or `claude` for Claude Code, `.codex` or `codex` for Codex. That covers `$HOME/.claude`, `$HOME/.codex`, and Docker mounts at `/sources/claude` and `/sources/codex`. Other locations need a symlink or mount with one of those names.
+Each source root maps to an agent by **folder name**: the last path component must be `.claude` or `claude` for Claude Code, `.codex` or `codex` for Codex, and `.cursor` or `cursor` for Cursor. That covers the home folders and Docker mounts at `/sources/claude`, `/sources/codex`, and `/sources/cursor`. Other locations need a symlink or mount with one of those names.
 
 Indexed files outside the configured source roots are removed on every rescan, so test fixtures or old paths do not linger after you change `OBS_SOURCES`.
 
 A rescan reads appended bytes. **Full rebuild** on the Sources page reparses every file. Rebuilding the index does not delete notes, hidden-project preferences, path allows, or benchmark cases.
 
 Codex conversation names are imported from `session_index.jsonl` in each configured Codex source root (normally `~/.codex`). Rescan refreshes renamed conversations even when their transcripts have not changed. Sources containing only transcripts use the first user message as the title. The Codex index is read-only; the app does not open Codex's internal state database.
+
+## Cursor
+
+Cursor Agent JSONL transcripts are imported from `~/.cursor/projects/<workspace>/agent-transcripts/`. Both flat `<id>.jsonl` files and `<id>/<id>.jsonl` directories are supported, including subagents. Messages, thinking, tool inputs, available tool results, and turn completion/error records appear in the timeline and search.
+
+Cursor transcripts often omit timestamps, models, token usage, tool call IDs, and tool outputs. Missing values stay unknown; no cost or duration is inferred from file metadata. Sessions are grouped by the workspace folder name. Its encoding is lossy, so it is not decoded into a project path: path alerts require an explicit `cwd` in the transcript. Legacy text transcripts and history stored only in Cursor's internal SQLite databases (including CLI chat storage) are not imported.
+
+Docker includes Cursor by default. For an existing local setup, add `$HOME/.cursor` to `OBS_SOURCES` in `backend/.env`, restart the backend, and rescan.
+
+Cursor's saved sidebar names are imported by conversation ID from its local metadata databases, opened in read-only mode. Rescan refreshes renames without reparsing transcripts. Local `~/.cursor` sources automatically use Cursor's standard `User` directory: `~/Library/Application Support/Cursor/User` on macOS, `$XDG_CONFIG_HOME/Cursor/User` (default `~/.config/Cursor/User`) on Linux, and `%APPDATA%/Cursor/User` on Windows. Set `OBS_CURSOR_USER_DATA_DIR` or `cursor_user_data_dir` for another installation. Unavailable metadata preserves imported names; unnamed conversations use their first user message.
+
+For Docker, add a read-only mount of that `User` folder at `/sources/cursor/user-data`, for example on macOS:
+
+```yaml
+volumes:
+  - "${HOME}/Library/Application Support/Cursor/User:/sources/cursor/user-data:ro"
+```
+
+Conversation names and recorded creation dates are imported from the databases; transcript content still comes from JSONL files. Creation dates let Cursor sessions appear in daily charts and date filters. Last-update times are not treated as completion times, so duration stays unknown when the transcript has no end time. Sessions without a recorded creation date remain in the session total but are excluded from daily charts.
 
 ## What is stored where
 

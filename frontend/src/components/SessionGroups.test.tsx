@@ -72,12 +72,11 @@ describe("hide and restore", () => {
         <Harness />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/Transcript files are not modified/)).toBeInTheDocument();
     expect(screen.getByText("Fix the parser")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Hide project" }));
     expect(screen.queryByText("Fix the parser")).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Source files were left untouched");
+    expect(screen.getByRole("status")).toHaveTextContent("Hid proj.");
 
     await user.click(screen.getByRole("button", { name: "Undo" }));
     expect(screen.getByText("Fix the parser")).toBeInTheDocument();

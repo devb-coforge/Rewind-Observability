@@ -1,7 +1,8 @@
 from obs.adapters.claude_code import ClaudeCodeAdapter
 from obs.adapters.codex import CodexAdapter
+from obs.adapters.cursor import CursorAdapter
 
-ADAPTERS = (ClaudeCodeAdapter(), CodexAdapter())
+ADAPTERS = (ClaudeCodeAdapter(), CodexAdapter(), CursorAdapter())
 
 
 def adapter_by_name(name: str):

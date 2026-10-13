@@ -53,6 +53,7 @@ export function AnalyticsPage() {
           <option value="">All agents</option>
           <option value="claude_code">Claude Code</option>
           <option value="codex">Codex</option>
+          <option value="cursor">Cursor</option>
         </FilterSelect>
         <FilterSelect label="Project" value={filters.project} onChange={(project) => setFilters({ ...filters, project })}>
           <option value="">All projects</option>
@@ -77,12 +78,6 @@ export function AnalyticsPage() {
           Include hidden
         </label>
       </div>
-      <p className="mb-4 text-sm text-muted">
-        Tokens and cost are estimates for understanding activity. Unknown usage stays blank, and totals only add the values that were reported.
-        {summary.data && summary.data.usage_coverage !== "complete"
-          ? ` ${summary.data.sessions_missing_usage} session(s) have incomplete usage.`
-          : ""}
-      </p>
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Sessions" value={summary.data ? String(summary.data.sessions) : "—"} />
         <Kpi
@@ -165,6 +160,7 @@ const palette = ["#e2b340", "#8fbf6a", "#7eb6d6", "#e36a58", "#c58be0"];
 function colorFor(key: string): string {
   if (key === "claude_code") return "#e2b340";
   if (key === "codex") return "#8fbf6a";
+  if (key === "cursor") return "#79b8df";
   return "#7eb6d6";
 }
 

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
-
-AgentName = Literal["claude_code", "codex"]
+from obs.models import AgentName
 
 _CLAUDE_DIR_NAMES = frozenset({".claude", "claude"})
 _CODEX_DIR_NAMES = frozenset({".codex", "codex"})
+_CURSOR_DIR_NAMES = frozenset({".cursor", "cursor"})
 
 
 def infer_agent_from_path(path: Path) -> AgentName | None:
@@ -16,4 +15,6 @@ def infer_agent_from_path(path: Path) -> AgentName | None:
         return "claude_code"
     if name in _CODEX_DIR_NAMES:
         return "codex"
+    if name in _CURSOR_DIR_NAMES:
+        return "cursor"
     return None

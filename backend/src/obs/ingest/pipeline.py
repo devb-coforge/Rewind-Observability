@@ -50,16 +50,27 @@ class Ingestor:
                         stats["files_parsed"] += 1
                         stats["events"] += added
                 self._prune(root, discovered, affected)
-                if adapter.name == "codex":
-                    titles = adapter.session_titles(root)
+                if hasattr(adapter, "session_titles"):
+                    metadata = adapter.session_metadata(root, self.config.cursor_user_data_dir) if adapter.name == "cursor" else None
+                    titles = (
+                        None if metadata is None else {sid: entry.get("title") for sid, entry in metadata.items()}
+                    ) if adapter.name == "cursor" else adapter.session_titles(root)
                     if titles is not None:
                         sessions = list(self.store.index.execute(
-                            "SELECT id, native_id, source_path, source_title FROM sessions WHERE agent = 'codex'"
+                            "SELECT id, native_id, source_path, source_title, started_at FROM sessions WHERE agent = ?",
+                            (adapter.name,),
                         ))
                         for session in sessions:
                             if not path_under_source(session["source_path"], source):
                                 continue
                             title = titles.get(session["native_id"])
+                            created_at = (metadata or {}).get(session["native_id"], {}).get("started_at")
+                            if session["started_at"] is None and created_at:
+                                self.store.index.execute(
+                                    "UPDATE sessions SET started_at = ? WHERE id = ?",
+                                    (created_at, session["id"]),
+                                )
+                                affected.add(session["id"])
                             if title != session["source_title"]:
                                 self.store.index.execute(
                                     "UPDATE sessions SET source_title = ? WHERE id = ?",
@@ -146,6 +157,11 @@ class Ingestor:
         existing = self.store.get_session(session_id)
         cwd = parsed.project_cwd or (existing["project_cwd"] if existing else None)
         identity = project_fields(adapter.name, cwd)
+        if not cwd and parsed.project_key:
+            # Workspace identifiers group transcripts without inventing a cwd.
+            identity = project_fields(adapter.name, parsed.project_key)
+            identity["project_cwd"] = None
+            identity["project_name"] = parsed.project_name
         inserted = 0
         pending_seq = 0
         for event in parsed.events:

@@ -117,6 +117,7 @@ export type Summary = {
   tool_errors: number;
   median_duration_sec: number | null;
   sessions_missing_usage: number;
+  sessions_missing_start: number;
 };
 
 export type SeriesPoint = {

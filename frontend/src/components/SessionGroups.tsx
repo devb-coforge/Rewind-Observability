@@ -47,8 +47,7 @@ export function SessionGroups({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
-        <p>Hiding a project removes it from lists, search, and analytics. Transcript files are not modified.</p>
+      <div className="flex flex-wrap items-center justify-end gap-3 text-sm text-muted">
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -61,7 +60,7 @@ export function SessionGroups({
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       {toast ? (
         <div role="status" className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface px-3 py-2 text-sm">
-          <span>Hid {toast.name}. Source files were left untouched.</span>
+          <span>Hid {toast.name}.</span>
           <button
             type="button"
             className="text-accent"

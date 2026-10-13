@@ -37,6 +37,7 @@ export function SessionsPage() {
           <option value="">All agents</option>
           <option value="claude_code">Claude Code</option>
           <option value="codex">Codex</option>
+          <option value="cursor">Cursor</option>
         </select>
         <select className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm" value={project} onChange={(event) => setProject(event.target.value)} aria-label="Project">
           <option value="">All projects</option>

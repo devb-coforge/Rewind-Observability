@@ -24,6 +24,7 @@ class BoundaryConfig(BaseModel):
 
 class AppConfig(BaseModel):
     sources: list[SourceConfig] = Field(default_factory=list)
+    cursor_user_data_dir: Path | None = None
     data_dir: Path = Path("./data")
     pricing_file: Path | None = None
     static_dir: Path | None = None
@@ -126,6 +127,7 @@ def load_config() -> AppConfig:
 
     return AppConfig(
         sources=[SourceConfig.model_validate(item) for item in sources],
+        cursor_user_data_dir=os.environ.get("OBS_CURSOR_USER_DATA_DIR") or data.get("cursor_user_data_dir"),
         data_dir=Path(data_dir),
         pricing_file=Path(pricing) if pricing else default_pricing_file(),
         static_dir=default_static_dir(),

@@ -24,6 +24,17 @@ function event(partial: Partial<ObsEvent> & Pick<ObsEvent, "id" | "kind">): ObsE
 }
 
 describe("pairEvents", () => {
+  it("renders Cursor calls without IDs as separate tool cards", () => {
+    const items = pairEvents([
+      event({ id: "c1", kind: "tool_call", tool_name: "Read", tool_input: { path: "app.py" } }),
+      event({ id: "c2", kind: "tool_call", tool_name: "Shell", tool_input: { command: "pwd" } }),
+    ]);
+    expect(items.map((item) => item.type)).toEqual(["tool", "tool"]);
+    expect(items.map(itemKey)).toEqual(["c1", "c2"]);
+    for (const item of items) {
+      if (item.type === "tool") expect(item.result).toBeUndefined();
+    }
+  });
   it("filters conversation, tools, and errors while retaining failed tool results", () => {
     const items = pairEvents([
       event({ id: "s", kind: "system" }),

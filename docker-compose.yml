@@ -6,9 +6,10 @@ services:
     volumes:
       - ${HOME}/.claude:/sources/claude:ro
       - ${HOME}/.codex:/sources/codex:ro
+      - ${HOME}/.cursor:/sources/cursor:ro
       - obs-data:/data
     environment:
-      OBS_SOURCES: /sources/claude,/sources/codex
+      OBS_SOURCES: /sources/claude,/sources/codex,/sources/cursor
       OBS_DATA_DIR: /data
       OBS_PRICING_FILE: /app/pricing.yaml
       PUID: ${PUID:-502}
