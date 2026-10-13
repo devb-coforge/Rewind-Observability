@@ -7,7 +7,7 @@ Usage and cost are estimates for understanding activity. They are not billing nu
 ## Run with Docker
 
 ```bash
-docker compose up --build
+PUID=$(id -u) PGID=$(id -g) docker compose up --build
 ```
 
 Open http://127.0.0.1:8080. The port is bound to localhost only.
@@ -19,7 +19,15 @@ Compose mounts:
 - `~/.cursor` at `/sources/cursor` (read-only)
 - a named volume `obs-data` at `/data`
 
-Set `PUID` and `PGID` if they are not `502` and `20`. The process drops to that user before it writes the database.
+The process drops to `PUID` and `PGID` before reading transcripts or writing the database. The command above uses your host user's IDs so private transcript folders remain readable. Compose defaults to `502` and `20` when these variables are omitted; those defaults often differ from Linux account IDs.
+
+If a rescan reports `Permission denied` for `/sources/claude` or `/sources/codex`, recreate the container with your host IDs:
+
+```bash
+PUID=$(id -u) PGID=$(id -g) docker compose up -d --build --force-recreate obs
+```
+
+Source folders must allow that user to read files and traverse directories. A permission failure aborts the scan and preserves the previous index, including during a full rebuild.
 
 To index another folder, add a read-only volume and include the container path in `OBS_SOURCES`:
 
