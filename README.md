@@ -71,7 +71,9 @@ Conversation names and recorded creation dates are imported from the databases; 
 |---|---|
 | Mounted transcript folders | Source of truth. Never written. |
 | `/data/index.db` | Sessions, events, search. Safe to delete; a rescan rebuilds it. |
-| `/data/user.db` | Session notes, hidden projects, path allows, benchmark cases. |
+| `/data/user.db` | Session notes, custom project names, hidden projects, path allows, benchmark cases. |
+
+Use the pencil on a project header in Sessions to change its display name. The name applies to every agent sharing that recorded path. Cursor workspaces without a recorded path join a project when their encoded workspace folder matches exactly one known path; unmatched or ambiguous workspaces remain separate. Renames update `sessions.project_name` in `index.db` and are preserved in `user.db` across rescans and full rebuilds. Renaming does not change paths. The trash icon hides the project's agent entries, with Undo available.
 
 Back up the volume, including `user.db`:
 

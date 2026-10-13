@@ -10,6 +10,12 @@ CREATE TABLE IF NOT EXISTS project_preferences (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS project_names (
+  project_key TEXT PRIMARY KEY,
+  project_name TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS boundary_dismissals (
   project_id TEXT NOT NULL,
   path_prefix TEXT NOT NULL,

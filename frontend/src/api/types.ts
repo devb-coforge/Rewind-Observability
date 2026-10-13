@@ -21,6 +21,7 @@ export type Session = {
   native_id: string;
   source_path: string;
   project_cwd: string | null;
+  project_group_cwd?: string | null;
   project_name: string | null;
   project_id: string;
   project_hidden: boolean;
@@ -87,6 +88,7 @@ export type Project = {
   agent: string;
   name: string;
   cwd: string | null;
+  group_cwd?: string | null;
   hidden: boolean;
   n_sessions: number;
 };

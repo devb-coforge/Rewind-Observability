@@ -57,7 +57,12 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ hidden }),
     }),
-  sessions: (filters: Filters & { q?: string; sort?: string; cursor?: string; limit?: number }) =>
+  renameProject: (projectId: string, name: string) =>
+    request<{ project_id: string; name: string }>(`/api/projects/${encodeURIComponent(projectId)}/name`, {
+      method: "PUT",
+      body: JSON.stringify({ name }),
+    }),
+  sessions: (filters: Filters & { project_cwd?: string; q?: string; sort?: string; cursor?: string; limit?: number }) =>
     request<{ sessions: Session[]; next_cursor: string | null }>(`/api/sessions${query(filters)}`),
   session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
   note: (id: string) => request<Note & { session_id: string }>(`/api/sessions/${encodeURIComponent(id)}/note`),

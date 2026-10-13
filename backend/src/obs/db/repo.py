@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -151,6 +152,11 @@ class Store:
         return row is not None
 
     def ensure_session(self, fields: dict) -> None:
+        fields = dict(fields)
+        key = self.project_name_key(fields.get("project_cwd"), fields["project_id"])
+        custom = self.user.execute("SELECT project_name FROM project_names WHERE project_key = ?", (key,)).fetchone()
+        if custom:
+            fields["project_name"] = custom["project_name"]
         self.index.execute(
             """
             INSERT INTO sessions(
@@ -564,8 +570,63 @@ class Store:
             (project_id, path_prefix),
         )
 
+    @staticmethod
+    def project_name_key(cwd: str | None, project_id: str) -> str:
+        return f"path:{cwd}" if cwd else f"id:{project_id}"
+
+    def project_group_paths(self) -> dict[str, str | None]:
+        rows = list(self.index.execute(
+            "SELECT project_id, project_cwd, agent, source_path FROM sessions GROUP BY project_id"
+        ))
+        candidates: dict[str, set[str]] = {}
+        for row in rows:
+            if row["project_cwd"]:
+                # Cursor encodes the directory as a workspace folder name.
+                slug = re.sub(r"[^a-zA-Z0-9-]", "-", row["project_cwd"]).strip("-")
+                candidates.setdefault(slug, set()).add(row["project_cwd"])
+        paths = {}
+        for row in rows:
+            cwd = row["project_cwd"]
+            if not cwd and row["agent"] == "cursor":
+                parts = Path(row["source_path"]).parts
+                if "agent-transcripts" in parts:
+                    position = parts.index("agent-transcripts")
+                    matches = candidates.get(parts[position - 1], set()) if position else set()
+                    if len(matches) == 1:
+                        cwd = next(iter(matches))
+            paths[row["project_id"]] = cwd
+        return paths
+
+    def refresh_project_names(self) -> None:
+        overrides = {row["project_key"]: row["project_name"] for row in self.user.execute("SELECT * FROM project_names")}
+        for project_id, cwd in self.project_group_paths().items():
+            name = overrides.get(self.project_name_key(cwd, project_id))
+            if name is not None:
+                self.index.execute("UPDATE sessions SET project_name = ? WHERE project_id = ?", (name, project_id))
+
+    def rename_project(self, project_id: str, name: str, now: str) -> bool:
+        project = self.index.execute(
+            "SELECT project_cwd FROM sessions WHERE project_id = ? LIMIT 1", (project_id,)
+        ).fetchone()
+        if project is None:
+            return False
+        group_paths = self.project_group_paths()
+        cwd = group_paths[project_id]
+        key = self.project_name_key(cwd, project_id)
+        self.user.execute(
+            """INSERT INTO project_names(project_key, project_name, updated_at) VALUES(?, ?, ?)
+               ON CONFLICT(project_key) DO UPDATE SET project_name = excluded.project_name,
+                 updated_at = excluded.updated_at""",
+            (key, name, now),
+        )
+        for target_id, target_cwd in group_paths.items():
+            if target_id == project_id or (cwd and target_cwd == cwd):
+                self.index.execute("UPDATE sessions SET project_name = ? WHERE project_id = ?", (name, target_id))
+        return True
+
     def list_projects(self, include_hidden: bool) -> list[dict]:
         hidden = set(self.hidden_ids())
+        group_paths = self.project_group_paths()
         rows = list(
             self.index.execute(
                 """
@@ -577,6 +638,7 @@ class Store:
             )
         )
         projects = []
+        path_names = {row["project_cwd"]: row["project_name"] for row in rows if row["project_cwd"]}
         for row in rows:
             is_hidden = row["project_id"] in hidden
             if is_hidden and not include_hidden:
@@ -585,8 +647,9 @@ class Store:
                 {
                     "project_id": row["project_id"],
                     "agent": row["agent"],
-                    "name": row["project_name"] or "(unknown)",
+                    "name": path_names.get(group_paths[row["project_id"]]) or row["project_name"] or "(unknown)",
                     "cwd": row["project_cwd"],
+                    "group_cwd": group_paths[row["project_id"]],
                     "hidden": is_hidden,
                     "n_sessions": row["n_sessions"],
                 }
@@ -594,6 +657,7 @@ class Store:
         return projects
 
     def list_sessions(self, **filters) -> dict:
+        self_group_paths = self.project_group_paths()
         where, params = self._session_filters(filters)
         sort = filters.get("sort") or "started_at"
         order, cursor_sql, cursor_params = _sort_clause(sort, filters.get("cursor"))
@@ -617,11 +681,11 @@ class Store:
             else:
                 next_cursor = f"off:{offset + limit}"
         return {
-            "sessions": [self.session_dict(row) for row in rows],
+            "sessions": [self.session_dict(row, self_group_paths) for row in rows],
             "next_cursor": next_cursor,
         }
 
-    def session_dict(self, row: sqlite3.Row) -> dict:
+    def session_dict(self, row: sqlite3.Row, group_paths: dict[str, str | None] | None = None) -> dict:
         models = json.loads(row["models_json"] or "[]")
         duration = _duration(row["started_at"], row["ended_at"])
         return {
@@ -630,6 +694,7 @@ class Store:
             "native_id": row["native_id"],
             "source_path": row["source_path"],
             "project_cwd": row["project_cwd"],
+            "project_group_cwd": (group_paths if group_paths is not None else self.project_group_paths()).get(row["project_id"]),
             "project_name": row["project_name"],
             "project_id": row["project_id"],
             "project_hidden": self.is_hidden(row["project_id"]),
@@ -770,6 +835,13 @@ class Store:
         if filters.get("project"):
             clauses.append("s.project_id = ?")
             params.append(filters["project"])
+        if filters.get("project_cwd"):
+            ids = [pid for pid, cwd in self.project_group_paths().items() if cwd == filters["project_cwd"]]
+            if ids:
+                clauses.append(f"s.project_id IN ({','.join('?' for _ in ids)})")
+                params.extend(ids)
+            else:
+                clauses.append("0=1")
         if filters.get("model"):
             clauses.append(
                 "EXISTS (SELECT 1 FROM session_models m WHERE m.session_id = s.id AND m.model = ?)"

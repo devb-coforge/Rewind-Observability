@@ -111,6 +111,7 @@ class Ingestor:
                     dismissals=dismissals.get(session["project_id"], []),
                 )
             self.store.drop_empty_sessions()
+            self.store.refresh_project_names()
             from datetime import datetime, timezone
 
             self.store.set_meta(
